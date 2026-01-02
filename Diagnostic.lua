@@ -1,379 +1,424 @@
--- Bee Swarm Simulator Token Diagnostic Tool
--- Запусти через: loadstring(game:HttpGet('https://raw.githubusercontent.com/ВАШ_АККАУНТ/ВАШ_РЕПОЗИТОРИЙ/main/Diagnostic.lua'))()
+-- Bee Swarm Simulator Token Finder (GUI Version)
+-- Загрузи этот файл как Diagnostic.lua в свой репозиторий
 
 local Player = game:GetService("Players").LocalPlayer
-local RunService = game:GetService("RunService")
 
-print("\n" .. string.rep("=", 60))
-print("🔍 BEE SWARM TOKEN DIAGNOSTIC TOOL v1.0")
-print(string.rep("=", 60))
-print("Инструкция:")
-print("1. Зайди на любое поле (Sunflower Field, Pineapple Patch и т.д.)")
-print("2. Подожди 30-60 секунд пока пчёлы выбросят токены")
-print("3. Смотри в консоль инжектора - там появятся названия объектов")
-print(string.rep("=", 60))
+-- Создаём видимое окно диагностики
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TokenDiagnostic"
+ScreenGui.Parent = game.CoreGui
 
--- Функция для поиска всех объектов, похожих на токены
-function ScanForTokens()
-    print("\n📡 СКАНИРУЮ ОБЪЕКТЫ...")
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 500, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Text = "🔍 ДИАГНОСТИКА ТОКЕНОВ BEE SWARM"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+Title.TextColor3 = Color3.fromRGB(255, 255, 0)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+-- Поле вывода логов
+local LogFrame = Instance.new("ScrollingFrame")
+LogFrame.Size = UDim2.new(0.95, 0, 0.7, 0)
+LogFrame.Position = UDim2.new(0.025, 0, 0.12, 0)
+LogFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+LogFrame.BackgroundTransparency = 0.2
+LogFrame.ScrollBarThickness = 8
+LogFrame.Parent = MainFrame
+
+local LogCorner = Instance.new("UICorner")
+LogCorner.CornerRadius = UDim.new(0, 8)
+LogCorner.Parent = LogFrame
+
+-- Контейнер для текста
+local LogContainer = Instance.new("TextLabel")
+LogContainer.Name = "LogText"
+LogContainer.Size = UDim2.new(1, -10, 0, 1000)
+LogContainer.Position = UDim2.new(0, 5, 0, 5)
+LogContainer.BackgroundTransparency = 1
+LogContainer.TextColor3 = Color3.fromRGB(200, 200, 255)
+LogContainer.TextSize = 14
+LogContainer.Font = Enum.Font.Code
+LogContainer.TextXAlignment = Enum.TextXAlignment.Left
+LogContainer.TextYAlignment = Enum.TextYAlignment.Top
+LogContainer.TextWrapped = true
+LogContainer.Text = "=== ДИАГНОСТИКА ЗАПУЩЕНА ===\n"
+LogContainer.Parent = LogFrame
+
+-- Функция добавления текста в лог
+function AddLog(text, color)
+    color = color or Color3.fromRGB(200, 200, 255)
     
-    local foundTokens = {}
-    local allObjects = {}
+    local timeStr = "[" .. os.date("%H:%M:%S") .. "] "
+    local coloredText = "<font color='rgb(" .. 
+        math.floor(color.r * 255) .. "," .. 
+        math.floor(color.g * 255) .. "," .. 
+        math.floor(color.b * 255) .. 
+        ")'>" .. timeStr .. text .. "</font><br/>"
     
-    -- Сканируем всё в Workspace
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Part") then
-            local name = obj.Name
-            local className = obj.ClassName
-            
-            -- Проверяем, похож ли объект на токен
-            local isToken = false
-            local reasons = {}
-            
-            -- Критерии для токенов:
-            if name:lower():find("token") then table.insert(reasons, "название содержит 'token'") end
-            if name:lower():find("boost") then table.insert(reasons, "название содержит 'boost'") end
-            if name:lower():find("orb") then table.insert(reasons, "название содержит 'orb'") end
-            if name:lower():find("ball") then table.insert(reasons, "название содержит 'ball'") end
-            if name:lower():find("pickup") then table.insert(reasons, "название содержит 'pickup'") end
-            if name:lower():find("collect") then table.insert(reasons, "название содержит 'collect'") end
-            if name:lower():find("power") then table.insert(reasons, "название содержит 'power'") end
-            if name:lower():find("ability") then table.insert(reasons, "название содержит 'ability'") end
-            
-            -- Проверяем цвет (токены обычно яркие)
-            if obj:FindFirstChild("Color") then
-                local color = obj.Color
-                -- Яркие цвета (красный, синий, жёлтый, зелёный)
-                if color.r > 0.8 or color.g > 0.8 or color.b > 0.8 then
-                    table.insert(reasons, "яркий цвет: " .. math.floor(color.r*255) .. "," .. math.floor(color.g*255) .. "," .. math.floor(color.b*255))
-                end
-            end
-            
-            if #reasons > 0 then
-                isToken = true
-                table.insert(foundTokens, {
-                    Object = obj,
-                    Name = name,
-                    Class = className,
-                    Reasons = reasons,
-                    Position = obj.Position
-                })
-            end
-            
-            -- Записываем все объекты для статистики
-            table.insert(allObjects, {
-                Name = name,
-                Class = className
-            })
-        end
-    end
+    LogContainer.Text = LogContainer.Text .. coloredText
     
-    -- Выводим результаты
-    print("📊 СТАТИСТИКА:")
-    print("Всего объектов в Workspace: " .. #allObjects)
-    print("Найдено кандидатов в токены: " .. #foundTokens)
-    
-    if #foundTokens > 0 then
-        print("\n🎯 ВОЗМОЖНЫЕ ТОКЕНЫ:")
-        for i, token in ipairs(foundTokens) do
-            print(string.format("%d. %s (%s)", i, token.Name, token.Class))
-            print("   Причины: " .. table.concat(token.Reasons, ", "))
-            print("   Позиция: " .. math.floor(token.Position.X) .. ", " .. math.floor(token.Position.Y) .. ", " .. math.floor(token.Position.Z))
-        end
-    else
-        print("\n⚠️ Токены не найдены!")
-        print("Подожди пока пчёлы выбросят токены или зайди на другое поле.")
-    end
-    
-    -- Анализ имён всех объектов (топ 20 самых частых)
-    local nameCounts = {}
-    for _, obj in ipairs(allObjects) do
-        nameCounts[obj.Name] = (nameCounts[obj.Name] or 0) + 1
-    end
-    
-    -- Сортируем по частоте
-    local sortedNames = {}
-    for name, count in pairs(nameCounts) do
-        table.insert(sortedNames, {name = name, count = count})
-    end
-    
-    table.sort(sortedNames, function(a, b) return a.count > b.count end)
-    
-    print("\n🏆 ТОП-20 САМЫХ ЧАСТЫХ ОБЪЕКТОВ:")
-    for i = 1, math.min(20, #sortedNames) do
-        print(string.format("%2d. %-30s - %d раз", i, sortedNames[i].name, sortedNames[i].count))
-    end
-    
-    return foundTokens
+    -- Автопрокрутка вниз
+    wait(0.01)
+    LogFrame.CanvasPosition = Vector2.new(0, LogContainer.AbsoluteSize.Y)
 end
 
--- Функция мониторинга новых объектов в реальном времени
-function StartRealTimeMonitoring(duration)
-    print("\n⏱️ ЗАПУСК РЕАЛЬНОГО МОНИТОРИНГА (" .. duration .. " секунд)")
-    print("Подожди пока пчёлы выбросят токены...")
+-- Создаём кнопки
+local ButtonContainer = Instance.new("Frame")
+ButtonContainer.Size = UDim2.new(0.95, 0, 0, 120)
+ButtonContainer.Position = UDim2.new(0.025, 0, 0.84, 0)
+ButtonContainer.BackgroundTransparency = 1
+ButtonContainer.Parent = MainFrame
+
+-- Функция создания кнопки
+function CreateButton(text, xPos, yPos, callback, color)
+    local button = Instance.new("TextButton")
+    button.Text = text
+    button.Size = UDim2.new(0.3, 0, 0, 35)
+    button.Position = UDim2.new(xPos, 0, yPos, 0)
+    button.BackgroundColor3 = color or Color3.fromRGB(60, 60, 100)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 14
+    button.Parent = ButtonContainer
     
-    local newTokens = {}
-    local startTime = tick()
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 6)
+    buttonCorner.Parent = button
     
-    -- Подписываемся на появление новых объектов
-    local connection = workspace.DescendantAdded:Connect(function(obj)
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("Part") then
-            local name = obj.Name:lower()
+    button.MouseButton1Click:Connect(callback)
+    
+    return button
+end
+
+-- Создаём кнопки действий
+CreateButton("📡 Сканировать", 0, 0, function()
+    AddLog("Запуск сканирования объектов...", Color3.fromRGB(100, 200, 255))
+    ScanForTokens()
+end, Color3.fromRGB(0, 100, 200))
+
+CreateButton("🎯 Найти токены", 0.34, 0, function()
+    AddLog("Поиск токенов вокруг...", Color3.fromRGB(100, 200, 255))
+    FindNearbyTokens()
+end, Color3.fromRGB(0, 150, 100))
+
+CreateButton("⏱️ Мониторинг", 0.68, 0, function()
+    AddLog("Запуск мониторинга на 60 сек...", Color3.fromRGB(100, 200, 255))
+    StartMonitoring(60)
+end, Color3.fromRGB(150, 100, 0))
+
+CreateButton("🧪 Тест сбора", 0, 0.4, function()
+    AddLog("Тестирование методов сбора...", Color3.fromRGB(100, 200, 255))
+    TestCollectionMethods()
+end, Color3.fromRGB(150, 0, 150))
+
+CreateButton("🗑️ Очистить лог", 0.34, 0.4, function()
+    LogContainer.Text = "=== ЛОГ ОЧИЩЕН ===\n"
+    AddLog("Лог очищен", Color3.fromRGB(255, 100, 100))
+end, Color3.fromRGB(200, 50, 50))
+
+CreateButton("❌ Закрыть", 0.68, 0.4, function()
+    ScreenGui:Destroy()
+end, Color3.fromRGB(200, 0, 0))
+
+-- Функция сканирования объектов
+function ScanForTokens()
+    AddLog("🔍 Анализирую объекты в игре...", Color3.fromRGB(255, 255, 100))
+    
+    local objects = {}
+    local tokenCandidates = {}
+    
+    -- Собираем все объекты
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+            table.insert(objects, {
+                Name = obj.Name,
+                Class = obj.ClassName
+            })
             
             -- Проверяем, похож ли на токен
-            if name:find("token") or name:find("boost") or name:find("orb") 
-               or name:find("ball") or name:find("pickup") then
+            local nameLower = obj.Name:lower()
+            if nameLower:find("token") or nameLower:find("boost") or 
+               nameLower:find("orb") or nameLower:find("ball") then
+                table.insert(tokenCandidates, obj)
+            end
+        end
+    end
+    
+    AddLog("Найдено объектов: " .. #objects, Color3.fromRGB(100, 255, 100))
+    AddLog("Кандидатов в токены: " .. #tokenCandidates, Color3.fromRGB(255, 200, 100))
+    
+    if #tokenCandidates > 0 then
+        AddLog("🎯 ВОЗМОЖНЫЕ ТОКЕНЫ:", Color3.fromRGB(255, 255, 0))
+        
+        -- Группируем по названиям
+        local nameCount = {}
+        for _, obj in ipairs(tokenCandidates) do
+            nameCount[obj.Name] = (nameCount[obj.Name] or 0) + 1
+        end
+        
+        -- Сортируем
+        local sortedNames = {}
+        for name, count in pairs(nameCount) do
+            table.insert(sortedNames, {name = name, count = count})
+        end
+        
+        table.sort(sortedNames, function(a, b) return a.count > b.count end)
+        
+        for i, data in ipairs(sortedNames) do
+            AddLog("  " .. data.name .. " - " .. data.count .. " шт", Color3.fromRGB(200, 200, 255))
+        end
+        
+        AddLog("💡 СКОПИРУЙ ЭТО НАЗВАНИЕ МНЕ: " .. sortedNames[1].name, Color3.fromRGB(0, 255, 0))
+    else
+        AddLog("⚠️ Кандидаты не найдены. Попробуй зайти на поле.", Color3.fromRGB(255, 100, 100))
+    end
+    
+    -- Топ общих объектов
+    local allNames = {}
+    for _, obj in ipairs(objects) do
+        allNames[obj.Name] = (allNames[obj.Name] or 0) + 1
+    end
+    
+    local topNames = {}
+    for name, count in pairs(allNames) do
+        table.insert(topNames, {name = name, count = count})
+    end
+    
+    table.sort(topNames, function(a, b) return a.count > b.count end)
+    
+    AddLog("\n📊 ТОП-10 ОБЪЕКТОВ В ИГРЕ:", Color3.fromRGB(100, 200, 255))
+    for i = 1, math.min(10, #topNames) do
+        AddLog(string.format("%2d. %-25s - %4d шт", 
+            i, topNames[i].name, topNames[i].count), Color3.fromRGB(180, 180, 255))
+    end
+end
+
+-- Функция поиска ближайших токенов
+function FindNearbyTokens()
+    local character = Player.Character
+    if not character then
+        AddLog("❌ Персонаж не найден", Color3.fromRGB(255, 100, 100))
+        return
+    end
+    
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then
+        AddLog("❌ Не могу найти корневую часть", Color3.fromRGB(255, 100, 100))
+        return
+    end
+    
+    AddLog("🔎 Ищу токены в радиусе 50 studs...", Color3.fromRGB(255, 200, 100))
+    
+    local foundTokens = {}
+    
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local distance = (root.Position - obj.Position).Magnitude
+            if distance < 50 then
+                local nameLower = obj.Name:lower()
+                if nameLower:find("token") or nameLower:find("boost") or 
+                   nameLower:find("orb") or nameLower:find("ball") then
+                    
+                    table.insert(foundTokens, {
+                        object = obj,
+                        name = obj.Name,
+                        distance = distance,
+                        position = obj.Position
+                    })
+                end
+            end
+        end
+    end
+    
+    AddLog("Найдено токенов рядом: " .. #foundTokens, Color3.fromRGB(100, 255, 100))
+    
+    if #foundTokens > 0 then
+        -- Сортируем по расстоянию
+        table.sort(foundTokens, function(a, b) return a.distance < b.distance end)
+        
+        for i, token in ipairs(foundTokens) do
+            AddLog(string.format("%d. %s (расстояние: %d)", 
+                i, token.name, math.floor(token.distance)), Color3.fromRGB(200, 255, 200))
+        end
+    else
+        AddLog("Рядом нет токенов. Подойди ближе к полю.", Color3.fromRGB(255, 150, 100))
+    end
+end
+
+-- Функция мониторинга в реальном времени
+function StartMonitoring(duration)
+    AddLog("🎥 Начинаю мониторинг новых объектов...", Color3.fromRGB(255, 200, 0))
+    AddLog("Время мониторинга: " .. duration .. " сек", Color3.fromRGB(200, 200, 255))
+    
+    local newObjects = {}
+    local startTime = tick()
+    
+    -- Отслеживаем новые объекты
+    local connection = workspace.DescendantAdded:Connect(function(obj)
+        if obj:IsA("BasePart") then
+            local nameLower = obj.Name:lower()
+            
+            if nameLower:find("token") or nameLower:find("boost") or 
+               nameLower:find("orb") or nameLower:find("ball") then
                 
-                local found = false
-                for _, t in ipairs(newTokens) do
-                    if t.Object == obj then
-                        found = true
+                -- Проверяем, не добавляли ли уже
+                local alreadyAdded = false
+                for _, addedObj in ipairs(newObjects) do
+                    if addedObj.object == obj then
+                        alreadyAdded = true
                         break
                     end
                 end
                 
-                if not found then
-                    table.insert(newTokens, {
-                        Object = obj,
-                        Name = obj.Name,
-                        Class = obj.ClassName,
-                        Time = tick()
+                if not alreadyAdded then
+                    table.insert(newObjects, {
+                        object = obj,
+                        name = obj.Name,
+                        time = tick() - startTime
                     })
                     
-                    print("[НОВЫЙ ОБЪЕКТ] " .. obj.Name .. " (" .. obj.ClassName .. ")")
-                    print("   Время появления: " .. math.floor(tick() - startTime) .. " сек")
-                    
-                    -- Проверяем цвет
-                    if obj:FindFirstChild("Color") then
-                        local color = obj.Color
-                        print("   Цвет: " .. math.floor(color.r*255) .. "," .. math.floor(color.g*255) .. "," .. math.floor(color.b*255))
-                    end
-                    
-                    -- Проверяем размер
-                    print("   Размер: " .. math.floor(obj.Size.X) .. "x" .. math.floor(obj.Size.Y) .. "x" .. math.floor(obj.Size.Z))
+                    AddLog("🆕 Появился: " .. obj.Name .. " (через " .. 
+                        math.floor(tick() - startTime) .. " сек)", Color3.fromRGB(0, 255, 0))
                 end
             end
         end
     end)
     
     -- Таймер
-    local timer = 0
-    while timer < duration do
-        wait(1)
-        timer = timer + 1
-        
-        -- Каждые 10 секунд показываем статус
-        if timer % 10 == 0 then
-            print("⏳ Мониторинг: " .. timer .. "/" .. duration .. " сек, найдено объектов: " .. #newTokens)
-        end
-    end
-    
-    -- Останавливаем мониторинг
-    connection:Disconnect()
-    
-    print("\n📊 ИТОГИ МОНИТОРИНГА:")
-    print("Время мониторинга: " .. duration .. " секунд")
-    print("Найдено новых объектов: " .. #newTokens)
-    
-    if #newTokens > 0 then
-        print("\n🎯 САМЫЕ ВЕРОЯТНЫЕ ТОКЕНЫ:")
-        -- Группируем по имени
-        local nameGroups = {}
-        for _, token in ipairs(newTokens) do
-            nameGroups[token.Name] = (nameGroups[token.Name] or 0) + 1
+    spawn(function()
+        for i = 1, duration do
+            wait(1)
+            if i % 10 == 0 then
+                AddLog("⏱️ Мониторинг: " .. i .. "/" .. duration .. " сек", 
+                    Color3.fromRGB(150, 150, 255))
+            end
         end
         
-        for name, count in pairs(nameGroups) do
-            print("   " .. name .. " - " .. count .. " раз")
-        end
+        -- Останавливаем мониторинг
+        connection:Disconnect()
         
-        print("\n💡 РЕКОМЕНДАЦИЯ:")
-        print("   Используй в основном скрипте объект: \"" .. newTokens[1].Name .. "\"")
-    else
-        print("\n⚠️ За время мониторинга токены не появились")
-        print("   Попробуй:")
-        print("   1. Подождать дольше (пчёлы могут быть неактивны)")
-        print("   2. Сменить поле")
-        print("   3. Активировать способности пчёл для генерации токенов")
-    end
-    
-    return newTokens
+        AddLog("✅ Мониторинг завершён!", Color3.fromRGB(100, 255, 100))
+        AddLog("Всего новых объектов: " .. #newObjects, Color3.fromRGB(255, 255, 100))
+        
+        if #newObjects > 0 then
+            AddLog("🎯 САМЫЕ ЧАСТЫЕ НАЗВАНИЯ:", Color3.fromRGB(255, 200, 0))
+            
+            local nameCount = {}
+            for _, objData in ipairs(newObjects) do
+                nameCount[objData.name] = (nameCount[objData.name] or 0) + 1
+            end
+            
+            for name, count in pairs(nameCount) do
+                AddLog("  " .. name .. " - " .. count .. " раз", Color3.fromRGB(200, 255, 200))
+            end
+        end
+    end)
 end
 
--- Функция тестового сбора токенов
-function TestTokenCollection()
-    print("\n🔄 ТЕСТ СБОРА ТОКЕНОВ")
-    print("Пытаемся собрать ближайшие объекты...")
+-- Функция тестирования методов сбора
+function TestCollectionMethods()
+    AddLog("🧪 Тестирую методы сбора...", Color3.fromRGB(255, 150, 0))
     
     local character = Player.Character
     if not character then
-        print("❌ Персонаж не найден")
+        AddLog("❌ Персонаж не найден", Color3.fromRGB(255, 100, 100))
         return
     end
     
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then
-        print("❌ HumanoidRootPart не найден")
+        AddLog("❌ HumanoidRootPart не найден", Color3.fromRGB(255, 100, 100))
         return
     end
     
-    local collected = 0
-    local attempts = 0
-    
-    -- Пробуем разные методы сбора
-    local methods = {
-        {"FireServer с именем объекта", function(token)
-            if game:GetService("ReplicatedStorage"):FindFirstChild("Events") then
-                for _, event in pairs(game:GetService("ReplicatedStorage").Events:GetChildren()) do
-                    if event:IsA("RemoteEvent") then
-                        pcall(function()
-                            event:FireServer(token.Name, token.Position)
-                            return true
-                        end)
-                    end
-                end
+    -- Ищем ближайший объект для теста
+    local testObject = nil
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local nameLower = obj.Name:lower()
+            if nameLower:find("token") or nameLower:find("boost") then
+                testObject = obj
+                break
             end
-            return false
-        end},
-        
-        {"TouchInterest", function(token)
-            pcall(function()
-                firetouchinterest(root, token, 0)
-                firetouchinterest(root, token, 1)
-                return true
-            end)
-            return false
-        end},
-        
-        {"ProximityPrompt", function(token)
-            if token:FindFirstChildWhichIsA("ProximityPrompt") then
+        end
+    end
+    
+    if not testObject then
+        AddLog("⚠️ Не нашёл объект для теста", Color3.fromRGB(255, 150, 100))
+        AddLog("Подойди к полю с токенами", Color3.fromRGB(255, 150, 100))
+        return
+    end
+    
+    AddLog("Тестирую объект: " .. testObject.Name, Color3.fromRGB(255, 255, 100))
+    
+    -- Тест 1: TouchInterest
+    AddLog("Проверяю TouchInterest...", Color3.fromRGB(200, 200, 255))
+    pcall(function()
+        firetouchinterest(root, testObject, 0)
+        firetouchinterest(root, testObject, 1)
+        AddLog("  ✅ TouchInterest выполнен", Color3.fromRGB(100, 255, 100))
+    end)
+    
+    -- Тест 2: ProximityPrompt
+    AddLog("Проверяю ProximityPrompt...", Color3.fromRGB(200, 200, 255))
+    if testObject:FindFirstChildWhichIsA("ProximityPrompt") then
+        pcall(function()
+            fireproximityprompt(testObject:FindFirstChildWhichIsA("ProximityPrompt"))
+            AddLog("  ✅ ProximityPrompt найден и активирован", Color3.fromRGB(100, 255, 100))
+        end)
+    else
+        AddLog("  ❌ ProximityPrompt не найден", Color3.fromRGB(255, 100, 100))
+    end
+    
+    -- Тест 3: RemoteEvents
+    AddLog("Проверяю RemoteEvents...", Color3.fromRGB(200, 200, 255))
+    if game:GetService("ReplicatedStorage"):FindFirstChild("Events") then
+        local events = game:GetService("ReplicatedStorage").Events
+        for _, event in pairs(events:GetChildren()) do
+            if event:IsA("RemoteEvent") then
                 pcall(function()
-                    fireproximityprompt(token:FindFirstChildWhichIsA("ProximityPrompt"))
-                    return true
+                    event:FireServer(testObject.Name, testObject.Position)
+                    AddLog("  ✅ Отправлен запрос к: " .. event.Name, Color3.fromRGB(100, 255, 100))
                 end)
             end
-            return false
-        end},
-        
-        {"CFrame телепорт", function(token)
-            pcall(function()
-                root.CFrame = CFrame.new(token.Position + Vector3.new(0, 3, 0))
-                return true
-            end)
-            return false
-        end}
-    }
-    
-    -- Ищем токены рядом
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            local name = obj.Name:lower()
-            if (name:find("token") or name:find("boost") or name:find("orb")) then
-                local distance = (root.Position - obj.Position).Magnitude
-                if distance < 50 then
-                    attempts = attempts + 1
-                    print("\nПробую собрать: " .. obj.Name .. " (расстояние: " .. math.floor(distance) .. ")")
-                    
-                    for i, method in ipairs(methods) do
-                        local success = method[2](obj)
-                        if success then
-                            print("   ✅ Метод \"" .. method[1] .. "\" сработал")
-                            collected = collected + 1
-                            break
-                        else
-                            print("   ❌ Метод \"" .. method[1] .. "\" не сработал")
-                        end
-                    end
-                    
-                    wait(0.5)
-                end
-            end
         end
-    end
-    
-    print("\n📊 РЕЗУЛЬТАТЫ ТЕСТА:")
-    print("Найдено токенов рядом: " .. attempts)
-    print("Успешно собрано: " .. collected)
-    
-    if collected > 0 then
-        print("🎉 Найден рабочий метод сбора!")
     else
-        print("⚠️ Ни один метод не сработал автоматически")
-        print("   Нужно определить правильный метод вручную")
+        AddLog("  ❌ Папка Events не найдена", Color3.fromRGB(255, 100, 100))
     end
+    
+    AddLog("✅ Тестирование завершено", Color3.fromRGB(100, 255, 100))
 end
 
--- Главное меню
-function ShowMenu()
-    print("\n" .. string.rep("=", 60))
-    print("📱 ГЛАВНОЕ МЕНЮ ДИАГНОСТИКИ")
-    print(string.rep("=", 60))
-    print("1. 🔍 Быстрое сканирование объектов")
-    print("2. ⏱️ Реальный мониторинг (60 секунд)")
-    print("3. 🎯 Расширенный мониторинг (120 секунд)")
-    print("4. 🧪 Тестовый сбор токенов")
-    print("5. 📊 Статистика всех объектов")
-    print("6. 🚪 Выход")
-    print(string.rep("=", 60))
-    
-    -- В реальном инжекторе нужно вводить через rconsole или подобное
-    -- Для простоты сделаем автоматическое выполнение всех тестов
-    
-    print("\n🚀 ЗАПУСКАЮ ПОЛНУЮ ДИАГНОСТИКУ...")
-    
-    -- Тест 1: Быстрое сканирование
-    local tokens = ScanForTokens()
-    
-    -- Тест 2: Реальный мониторинг (30 секунд)
-    if #tokens == 0 then
-        print("\n" .. string.rep("-", 60))
-        print("Запускаю мониторинг на 30 секунд...")
-        StartRealTimeMonitoring(30)
-    end
-    
-    -- Тест 3: Тестовый сбор
-    print("\n" .. string.rep("-", 60))
-    TestTokenCollection()
-    
-    -- Финальные рекомендации
-    print("\n" .. string.rep("=", 60))
-    print("📝 ИНСТРУКЦИЯ ДЛЯ ОСНОВНОГО СКРИПТА:")
-    print(string.rep("=", 60))
-    print("1. Скопируй самое частое название токена из результатов выше")
-    print("2. Сообщи это название мне")
-    print("3. Я добавлю автоматический сбор в основной скрипт")
-    print("")
-    print("💡 Пример того, что нужно сообщить:")
-    print("   'Название токена: BoostToken'")
-    print("   или 'Название токена: RedOrb'")
-    print("   или 'Название токена: AbilityPickup'")
-    print(string.rep("=", 60))
-    
-    -- Автоматический поиск наиболее вероятного названия
-    local allNames = {}
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            local name = obj.Name
-            if name:lower():find("token") or name:lower():find("boost") or name:lower():find("orb") then
-                allNames[name] = (allNames[name] or 0) + 1
-            end
-        end
-    end
-    
-    if next(allNames) then
-        print("\n🎲 САМЫЕ ВЕРОЯТНЫЕ НАЗВАНИЯ ТОКЕНОВ:")
-        for name, count in pairs(allNames) do
-            print("   " .. name .. " - " .. count .. " шт")
-        end
-    end
-end
+-- Автоматически запускаем сканирование при старте
+wait(1)
+AddLog("🚀 Диагностический инструмент загружен!", Color3.fromRGB(0, 255, 0))
+AddLog("Инструкция:", Color3.fromRGB(255, 255, 100))
+AddLog("1. Зайди на поле (Sunflower, Pineapple и т.д.)", Color3.fromRGB(200, 200, 255))
+AddLog("2. Нажми 'Сканировать'", Color3.fromRGB(200, 200, 255))
+AddLog("3. Подожди пока пчёлы выбросят токены", Color3.fromRGB(200, 200, 255))
+AddLog("4. Нажми 'Мониторинг' для отслеживания", Color3.fromRGB(200, 200, 255))
+AddLog("5. Сообщи мне название токена из лога", Color3.fromRGB(255, 255, 0))
+AddLog("", Color3.fromRGB(200, 200, 255))
 
--- Запускаем диагностику
-ShowMenu()
-
--- Сохраняем скрипт активным на 2 минуты для мониторинга
-print("\n⏰ Диагностика завершена. Скрипт останется активным 120 секунд для наблюдения.")
-print("Нажми F9 чтобы закрыть консоль инжектора когда закончишь.")
-
-wait(120)
-print("\n✅ Диагностика завершена. Можешь закрыть консоль.")
+-- Авто-сканирование через 3 секунды
+wait(3)
+AddLog("⏰ Автоматически сканирую через 3 секунды...", Color3.fromRGB(255, 200, 0))
+wait(3)
+ScanForTokens()
