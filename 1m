@@ -1,8 +1,7 @@
--- Bee Swarm Simulator Auto Farmer ULTIMATE v4.0
+-- Bee Swarm Simulator ULTIMATE FARMER v5.0
 -- Вставь в инжектор: loadstring(game:HttpGet('https://raw.githubusercontent.com/tamoha666/ResearchModule1.lua/refs/heads/main/1m'))()
 
 local Player = game:GetService("Players").LocalPlayer
-local Mouse = Player:GetMouse()
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 
@@ -12,88 +11,166 @@ local Settings = {
     JumpPower = 50,
     AutoFarm = false,
     AutoTokens = false,
-    ClickDelay = 0.05, -- Задержка между кликами
-    TokenRange = 100,
+    ClickDelay = 0.05,
+    TokenRange = 50,
     CurrentField = "Sunflower Field",
-    FarmRadius = 100, -- Радиус фарма на поле
-    WalkMode = "Random", -- Random, Circle, Square
-    DebugMode = false
+    WalkMode = "Random",
+    FarmRadius = 80,
+    MoveSpeed = 1,
+    TokenName = "Orb" -- ТОКЕНЫ НАЗЫВАЮТСЯ "Orb"
 }
 
--- Координаты полей (центры)
-local FieldPositions = {
-    ["Sunflower Field"] = Vector3.new(0, 0, 0), -- Замени на реальные координаты!
-    ["Pineapple Patch"] = Vector3.new(100, 0, 100),
-    ["Bamboo Field"] = Vector3.new(-100, 0, 100),
-    ["Mushroom Field"] = Vector3.new(0, 0, -100)
+-- Цветовая схема
+local Colors = {
+    Background = Color3.fromRGB(25, 25, 35),
+    Header = Color3.fromRGB(44, 44, 60),
+    Button = Color3.fromRGB(65, 65, 90),
+    ButtonHover = Color3.fromRGB(80, 80, 110),
+    Text = Color3.fromRGB(240, 240, 255),
+    Accent = Color3.fromRGB(255, 215, 0),
+    Success = Color3.fromRGB(100, 255, 100),
+    Danger = Color3.fromRGB(255, 100, 100)
 }
 
--- Интерфейс
+-- Создаём интерфейс с прокруткой
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BeeFarmULTIMATE"
+ScreenGui.Name = "BeeFarmPro"
 ScreenGui.Parent = game.CoreGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 350, 0, 500)
-MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+MainFrame.Position = UDim2.new(0.05, 0, 0.1, 0)
+MainFrame.BackgroundColor3 = Colors.Background
 MainFrame.BackgroundTransparency = 0.1
 MainFrame.Active = true
 MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 12)
 UICorner.Parent = MainFrame
 
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(60, 60, 80)
+UIStroke.Parent = MainFrame
+
 -- Заголовок
 local Title = Instance.new("TextLabel")
-Title.Text = "🐝 ULTIMATE BEE FARMER"
-Title.Size = UDim2.new(1, 0, 0, 50)
-Title.BackgroundColor3 = Color3.fromRGB(44, 44, 60)
-Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+Title.Text = "🐝 BEE SWARM FARMER v5.0"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Colors.Header
+Title.TextColor3 = Colors.Accent
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18
+Title.TextSize = 16
 Title.Parent = MainFrame
 
 local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 12)
 TitleCorner.Parent = Title
 
--- Функция создания кнопки
-local function CreateButton(text, yPos, callback, color)
+-- Закрыть кнопка
+local CloseButton = Instance.new("TextButton")
+CloseButton.Text = "×"
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -35, 0.5, -15)
+CloseButton.BackgroundColor3 = Colors.Danger
+CloseButton.TextColor3 = Colors.Text
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 20
+CloseButton.Parent = Title
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(1, 0)
+CloseCorner.Parent = CloseButton
+
+-- Прокручиваемая область
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, -10, 1, -60)
+ScrollFrame.Position = UDim2.new(0, 5, 0, 45)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.ScrollBarImageColor3 = Colors.Accent
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 1000)
+ScrollFrame.Parent = MainFrame
+
+-- Переменные для кнопок (чтобы обновлять текст)
+local CurrentButtons = {}
+
+-- Функция создания кнопки с обновляемым текстом
+function CreateButton(text, yPos, callback, color, isToggle)
+    local buttonFrame = Instance.new("Frame")
+    buttonFrame.Size = UDim2.new(1, 0, 0, 40)
+    buttonFrame.Position = UDim2.new(0, 0, 0, yPos)
+    buttonFrame.BackgroundTransparency = 1
+    buttonFrame.Parent = ScrollFrame
+    
     local button = Instance.new("TextButton")
+    button.Name = text:match("([^:]+)") or text -- Сохраняем первую часть текста как имя
     button.Text = text
-    button.Size = UDim2.new(0.9, 0, 0, 40)
-    button.Position = UDim2.new(0.05, 0, 0, yPos)
-    button.BackgroundColor3 = color or Color3.fromRGB(65, 65, 90)
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Size = UDim2.new(1, 0, 1, 0)
+    button.BackgroundColor3 = color or Colors.Button
+    button.TextColor3 = Colors.Text
     button.Font = Enum.Font.Gotham
     button.TextSize = 14
-    button.Parent = MainFrame
+    button.AutoButtonColor = false
+    button.Parent = buttonFrame
     
     local buttonCorner = Instance.new("UICorner")
     buttonCorner.CornerRadius = UDim.new(0, 8)
     buttonCorner.Parent = button
     
-    button.MouseButton1Click:Connect(callback)
+    local buttonStroke = Instance.new("UIStroke")
+    buttonStroke.Thickness = 1
+    buttonStroke.Color = Color3.fromRGB(80, 80, 100)
+    buttonStroke.Parent = button
     
-    return button
+    -- Эффект при наведении
+    button.MouseEnter:Connect(function()
+        game:GetService("TweenService"):Create(
+            button,
+            TweenInfo.new(0.2),
+            {BackgroundColor3 = Colors.ButtonHover}
+        ):Play()
+    end)
+    
+    button.MouseLeave:Connect(function()
+        game:GetService("TweenService"):Create(
+            button,
+            TweenInfo.new(0.2),
+            {BackgroundColor3 = color or Colors.Button}
+        ):Play()
+    end)
+    
+    -- Обработка нажатия
+    button.MouseButton1Click:Connect(function()
+        if callback then
+            callback(button) -- Передаём саму кнопку для обновления текста
+        end
+    end)
+    
+    -- Сохраняем ссылку если это переключаемое меню
+    if isToggle then
+        CurrentButtons[button.Name] = button
+    end
+    
+    return button, buttonFrame
 end
 
 -- Функция создания переключателя
-local function CreateToggle(text, yPos, initialState, callback)
+function CreateToggle(text, yPos, initialState, callback)
     local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = UDim2.new(0.9, 0, 0, 40)
-    toggleFrame.Position = UDim2.new(0.05, 0, 0, yPos)
+    toggleFrame.Size = UDim2.new(1, 0, 0, 40)
+    toggleFrame.Position = UDim2.new(0, 0, 0, yPos)
     toggleFrame.BackgroundTransparency = 1
-    toggleFrame.Parent = MainFrame
+    toggleFrame.Parent = ScrollFrame
     
     local toggleText = Instance.new("TextLabel")
     toggleText.Text = text
     toggleText.Size = UDim2.new(0.7, 0, 1, 0)
     toggleText.BackgroundTransparency = 1
-    toggleText.TextColor3 = Color3.fromRGB(240, 240, 255)
+    toggleText.TextColor3 = Colors.Text
     toggleText.Font = Enum.Font.Gotham
     toggleText.TextSize = 14
     toggleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -102,9 +179,9 @@ local function CreateToggle(text, yPos, initialState, callback)
     local toggleButton = Instance.new("TextButton")
     toggleButton.Size = UDim2.new(0, 50, 0, 25)
     toggleButton.Position = UDim2.new(1, -55, 0.5, -12.5)
-    toggleButton.BackgroundColor3 = initialState and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
-    toggleButton.Text = initialState and "ON" or "OFF"
-    toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleButton.BackgroundColor3 = initialState and Colors.Success or Colors.Danger
+    toggleButton.Text = initialState and "ВКЛ" or "ВЫКЛ"
+    toggleButton.TextColor3 = Colors.Text
     toggleButton.Font = Enum.Font.GothamBold
     toggleButton.TextSize = 12
     toggleButton.Parent = toggleFrame
@@ -114,9 +191,9 @@ local function CreateToggle(text, yPos, initialState, callback)
     toggleCorner.Parent = toggleButton
     
     toggleButton.MouseButton1Click:Connect(function()
-        local newState = not (toggleButton.Text == "ON")
-        toggleButton.Text = newState and "ON" or "OFF"
-        toggleButton.BackgroundColor3 = newState and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+        local newState = not (toggleButton.Text == "ВКЛ")
+        toggleButton.Text = newState and "ВКЛ" or "ВЫКЛ"
+        toggleButton.BackgroundColor3 = newState and Colors.Success or Colors.Danger
         
         if callback then
             callback(newState)
@@ -126,51 +203,202 @@ local function CreateToggle(text, yPos, initialState, callback)
     return toggleButton
 end
 
--- Создаём элементы
-local currentY = 60
+-- Функция создания слайдера для SpeedHack
+function CreateSpeedSlider(text, yPos, min, max, defaultValue, callback)
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = UDim2.new(1, 0, 0, 60)
+    sliderFrame.Position = UDim2.new(0, 0, 0, yPos)
+    sliderFrame.BackgroundTransparency = 1
+    sliderFrame.Parent = ScrollFrame
+    
+    local sliderText = Instance.new("TextLabel")
+    sliderText.Text = text
+    sliderText.Size = UDim2.new(1, 0, 0, 20)
+    sliderText.BackgroundTransparency = 1
+    sliderText.TextColor3 = Colors.Text
+    sliderText.Font = Enum.Font.Gotham
+    sliderText.TextSize = 14
+    sliderText.TextXAlignment = Enum.TextXAlignment.Left
+    sliderText.Parent = sliderFrame
+    
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Name = "ValueLabel"
+    valueLabel.Text = tostring(defaultValue)
+    valueLabel.Size = UDim2.new(0, 50, 0, 20)
+    valueLabel.Position = UDim2.new(1, -50, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.TextColor3 = Colors.Accent
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.TextSize = 14
+    valueLabel.Parent = sliderFrame
+    
+    local sliderTrack = Instance.new("Frame")
+    sliderTrack.Size = UDim2.new(1, 0, 0, 6)
+    sliderTrack.Position = UDim2.new(0, 0, 0, 30)
+    sliderTrack.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
+    sliderTrack.Parent = sliderFrame
+    
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    trackCorner.Parent = sliderTrack
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Name = "Fill"
+    sliderFill.Size = UDim2.new((defaultValue - min) / (max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Colors.Accent
+    sliderFill.Parent = sliderTrack
+    
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = sliderFill
+    
+    local sliderButton = Instance.new("TextButton")
+    sliderButton.Size = UDim2.new(0, 20, 0, 20)
+    sliderButton.Position = UDim2.new((defaultValue - min) / (max - min), -10, 0.5, -10)
+    sliderButton.BackgroundColor3 = Colors.Text
+    sliderButton.Text = ""
+    sliderButton.Parent = sliderTrack
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(1, 0)
+    buttonCorner.Parent = sliderButton
+    
+    local dragging = false
+    
+    local function updateSlider(value)
+        value = math.clamp(value, min, max)
+        value = math.floor(value)
+        
+        valueLabel.Text = tostring(value)
+        sliderFill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
+        sliderButton.Position = UDim2.new((value - min) / (max - min), -10, 0.5, -10)
+        
+        if callback then
+            callback(value)
+        end
+    end
+    
+    -- Обработка перетаскивания
+    sliderButton.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    UIS.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local relativeX = (input.Position.X - sliderTrack.AbsolutePosition.X) / sliderTrack.AbsoluteSize.X
+            local value = min + (relativeX * (max - min))
+            updateSlider(value)
+        end
+    end)
+    
+    -- Кнопки + и -
+    local minusButton = Instance.new("TextButton")
+    minusButton.Text = "-"
+    minusButton.Size = UDim2.new(0, 30, 0, 30)
+    minusButton.Position = UDim2.new(0, 0, 0, 40)
+    minusButton.BackgroundColor3 = Colors.Button
+    minusButton.TextColor3 = Colors.Text
+    minusButton.Font = Enum.Font.GothamBold
+    minusButton.TextSize = 16
+    minusButton.Parent = sliderFrame
+    
+    local minusCorner = Instance.new("UICorner")
+    minusCorner.CornerRadius = UDim.new(0, 6)
+    minusCorner.Parent = minusButton
+    
+    local plusButton = Instance.new("TextButton")
+    plusButton.Text = "+"
+    plusButton.Size = UDim2.new(0, 30, 0, 30)
+    plusButton.Position = UDim2.new(1, -30, 0, 40)
+    plusButton.BackgroundColor3 = Colors.Button
+    plusButton.TextColor3 = Colors.Text
+    plusButton.Font = Enum.Font.GothamBold
+    plusButton.TextSize = 16
+    plusButton.Parent = sliderFrame
+    
+    local plusCorner = Instance.new("UICorner")
+    plusCorner.CornerRadius = UDim.new(0, 6)
+    plusCorner.Parent = plusButton
+    
+    minusButton.MouseButton1Click:Connect(function()
+        updateSlider(tonumber(valueLabel.Text) - 5)
+    end)
+    
+    plusButton.MouseButton1Click:Connect(function()
+        updateSlider(tonumber(valueLabel.Text) + 5)
+    end)
+    
+    return valueLabel
+end
 
--- SpeedHack
-CreateButton("⚡ Скорость: " .. Settings.WalkSpeed, currentY, function()
-    Settings.WalkSpeed = Settings.WalkSpeed + 10
-    if Settings.WalkSpeed > 200 then Settings.WalkSpeed = 16 end
+-- Создаём элементы интерфейса
+local currentY = 0
+
+-- SpeedHack слайдеры
+CreateSpeedSlider("⚡ СКОРОСТЬ БЕГА", currentY, 16, 200, Settings.WalkSpeed, function(value)
+    Settings.WalkSpeed = value
     ApplySpeedHack()
-    print("[SPEED] Установлена скорость: " .. Settings.WalkSpeed)
-end, Color3.fromRGB(80, 160, 255))
-currentY = currentY + 50
+end)
+currentY = currentY + 70
 
--- Прыжки
-CreateButton("🦘 Прыжок: " .. Settings.JumpPower, currentY, function()
-    Settings.JumpPower = Settings.JumpPower + 10
-    if Settings.JumpPower > 200 then Settings.JumpPower = 50 end
+CreateSpeedSlider("🦘 ВЫСОТА ПРЫЖКА", currentY, 50, 200, Settings.JumpPower, function(value)
+    Settings.JumpPower = value
     ApplySpeedHack()
-    print("[JUMP] Установлена высота: " .. Settings.JumpPower)
-end, Color3.fromRGB(80, 160, 255))
-currentY = currentY + 50
+end)
+currentY = currentY + 70
 
--- Автофарм пыльцы
-local farmToggle = CreateToggle("🌻 АВТОФАРМ ПЫЛЬЦЫ", currentY, false, function(state)
+-- Разделитель
+local separator1 = Instance.new("Frame")
+separator1.Size = UDim2.new(1, 0, 0, 2)
+separator1.Position = UDim2.new(0, 0, 0, currentY)
+separator1.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+separator1.Parent = ScrollFrame
+currentY = currentY + 10
+
+-- Автофарм
+local section1 = Instance.new("TextLabel")
+section1.Text = "🌻 АВТОФАРМ"
+section1.Size = UDim2.new(1, 0, 0, 30)
+section1.Position = UDim2.new(0, 0, 0, currentY)
+section1.BackgroundTransparency = 1
+section1.TextColor3 = Colors.Accent
+section1.Font = Enum.Font.GothamBold
+section1.TextSize = 16
+section1.TextXAlignment = Enum.TextXAlignment.Left
+section1.Parent = ScrollFrame
+currentY = currentY + 40
+
+local autoFarmToggle = CreateToggle("Сбор пыльцы (клик LMB)", currentY, false, function(state)
     Settings.AutoFarm = state
     if state then
-        print("[AUTOFARM] Автофарм запущен на поле: " .. Settings.CurrentField)
+        print("[АВТОФАРМ] Запущен сбор пыльцы")
         StartAutoFarm()
     else
-        print("[AUTOFARM] Автофарм остановлен")
+        print("[АВТОФАРМ] Сбор пыльцы остановлен")
     end
 end)
 currentY = currentY + 50
 
--- Автосбор токенов (пока неактивен)
-local tokenToggle = CreateToggle("🌟 АВТОСБОР ТОКЕНОВ (СКОРО)", currentY, false, function(state)
+local autoTokensToggle = CreateToggle("Сбор токенов (Orb)", currentY, false, function(state)
     Settings.AutoTokens = state
     if state then
-        print("[TOKENS] Автосбор токенов будет добавлен после диагностики")
+        print("[ТОКЕНЫ] Запущен сбор Orb")
+        StartTokenCollect()
+    else
+        print("[ТОКЕНЫ] Сбор Orb остановлен")
     end
 end)
 currentY = currentY + 50
 
--- Выбор поля
-CreateButton("🌍 Поле: " .. Settings.CurrentField, currentY, function()
-    local fields = {"Sunflower Field", "Pineapple Patch", "Bamboo Field", "Mushroom Field"}
+-- Кнопка выбора поля (с обновляемым текстом)
+local fieldButton = CreateButton("🌍 Поле: " .. Settings.CurrentField, currentY, function(btn)
+    local fields = {"Sunflower Field", "Pineapple Patch", "Bamboo Field", "Mushroom Field", "Clover Field"}
     local currentIndex = 1
     for i, field in ipairs(fields) do
         if field == Settings.CurrentField then
@@ -180,12 +408,13 @@ CreateButton("🌍 Поле: " .. Settings.CurrentField, currentY, function()
     end
     local nextIndex = (currentIndex % #fields) + 1
     Settings.CurrentField = fields[nextIndex]
-    print("[FIELD] Выбрано поле: " .. Settings.CurrentField)
-end, Color3.fromRGB(100, 200, 100))
+    btn.Text = "🌍 Поле: " .. Settings.CurrentField
+    print("[ПОЛЕ] Выбрано: " .. Settings.CurrentField)
+end, Color3.fromRGB(80, 160, 80), true)
 currentY = currentY + 50
 
--- Режим ходьбы
-CreateButton("🚶 Режим: " .. Settings.WalkMode, currentY, function()
+-- Кнопка выбора режима (с обновляемым текстом)
+local modeButton = CreateButton("🚶 Режим: " .. Settings.WalkMode, currentY, function(btn)
     local modes = {"Random", "Circle", "Square", "ZigZag"}
     local currentIndex = 1
     for i, mode in ipairs(modes) do
@@ -196,99 +425,111 @@ CreateButton("🚶 Режим: " .. Settings.WalkMode, currentY, function()
     end
     local nextIndex = (currentIndex % #modes) + 1
     Settings.WalkMode = modes[nextIndex]
-    print("[WALKMODE] Установлен режим: " .. Settings.WalkMode)
-end)
+    btn.Text = "🚶 Режим: " .. Settings.WalkMode
+    print("[РЕЖИМ] Установлен: " .. Settings.WalkMode)
+end, nil, true)
 currentY = currentY + 50
 
--- Диагностика
-CreateButton("🔍 ДИАГНОСТИКА ТОКЕНОВ", currentY, function()
-    print("\n=== ЗАПУСК ДИАГНОСТИКИ ===")
-    print("1. Перейди на поле с токенами")
-    print("2. Подожди пока пчёлы выбросят токены")
-    print("3. Посмотри в консоль инжектора")
-    
-    -- Сканируем объекты вокруг
-    local objects = workspace:GetDescendants()
-    local tokenCount = 0
-    
-    for _, obj in pairs(objects) do
-        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
-            local name = obj.Name:lower()
-            if name:find("token") or name:find("boost") or name:find("orb") then
-                tokenCount = tokenCount + 1
-                print(string.format("Токен #%d: %s (%s)", tokenCount, obj.Name, obj.ClassName))
-            end
-        end
-    end
-    
-    print("Найдено объектов-кандидатов: " .. tokenCount)
-    print("Если 0 - подожди пока пчёлы выбросят токены")
-end, Color3.fromRGB(255, 165, 0))
-currentY = currentY + 50
+-- Разделитель
+local separator2 = Instance.new("Frame")
+separator2.Size = UDim2.new(1, 0, 0, 2)
+separator2.Position = UDim2.new(0, 0, 0, currentY)
+separator2.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+separator2.Parent = ScrollFrame
+currentY = currentY + 10
 
--- Телепорт на поле
-CreateButton("📡 ТЕЛЕПОРТ НА ПОЛЕ", currentY, function()
+-- Утилиты
+local section2 = Instance.new("TextLabel")
+section2.Text = "🔧 УТИЛИТЫ"
+section2.Size = UDim2.new(1, 0, 0, 30)
+section2.Position = UDim2.new(0, 0, 0, currentY)
+section2.BackgroundTransparency = 1
+section2.TextColor3 = Colors.Accent
+section2.Font = Enum.Font.GothamBold
+section2.TextSize = 16
+section2.TextXAlignment = Enum.TextXAlignment.Left
+section2.Parent = ScrollFrame
+currentY = currentY + 40
+
+CreateButton("📡 Телепорт на поле", currentY, function()
     TeleportToField(Settings.CurrentField)
-end, Color3.fromRGB(160, 100, 255))
+end, Color3.fromRGB(100, 100, 200))
 currentY = currentY + 50
 
--- Отладка
-CreateButton("🐛 РЕЖИМ ОТЛАДКИ", currentY, function()
-    Settings.DebugMode = not Settings.DebugMode
-    print("[DEBUG] Режим отладки: " .. (Settings.DebugMode and "ВКЛ" or "ВЫКЛ"))
-end)
+CreateButton("🏠 Телепорт к улью", currentY, function()
+    TeleportToHive()
+end, Color3.fromRGB(100, 100, 200))
 currentY = currentY + 50
 
--- Статистика
-CreateButton("📊 СТАТИСТИКА", currentY, function()
+CreateButton("📊 Показать статистику", currentY, function()
     ShowStats()
-end)
+end, Color3.fromRGB(80, 160, 80))
 currentY = currentY + 50
 
--- Выход
-CreateButton("❌ ЗАКРЫТЬ ИНТЕРФЕЙС", currentY, function()
-    ScreenGui:Destroy()
-    print("[UI] Интерфейс закрыт")
-end, Color3.fromRGB(255, 100, 100))
+CreateButton("⚙️ Оптимизировать FPS", currentY, function()
+    OptimizeGame()
+end, Color3.fromRGB(160, 100, 160))
+currentY = currentY + 50
 
--- ФУНКЦИИ АВТОФАРМА
+-- Статистика в реальном времени
+local statsFrame = Instance.new("Frame")
+statsFrame.Size = UDim2.new(1, 0, 0, 80)
+statsFrame.Position = UDim2.new(0, 0, 0, currentY)
+statsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+statsFrame.Parent = ScrollFrame
+
+local statsCorner = Instance.new("UICorner")
+statsCorner.CornerRadius = UDim.new(0, 8)
+statsCorner.Parent = statsFrame
+
+local statsTitle = Instance.new("TextLabel")
+statsTitle.Text = "📈 СТАТИСТИКА"
+statsTitle.Size = UDim2.new(1, 0, 0, 25)
+statsTitle.BackgroundTransparency = 1
+statsTitle.TextColor3 = Colors.Accent
+statsTitle.Font = Enum.Font.GothamBold
+statsTitle.TextSize = 14
+statsTitle.Parent = statsFrame
+
+local pollenLabel = Instance.new("TextLabel")
+pollenLabel.Name = "PollenLabel"
+pollenLabel.Text = "Пыльца: 0"
+pollenLabel.Size = UDim2.new(1, -10, 0, 20)
+pollenLabel.Position = UDim2.new(0, 5, 0, 25)
+pollenLabel.BackgroundTransparency = 1
+pollenLabel.TextColor3 = Colors.Text
+pollenLabel.Font = Enum.Font.Gotham
+pollenLabel.TextSize = 12
+pollenLabel.TextXAlignment = Enum.TextXAlignment.Left
+pollenLabel.Parent = statsFrame
+
+local beesLabel = Instance.new("TextLabel")
+beesLabel.Name = "BeesLabel"
+beesLabel.Text = "Пчёлы: 0"
+beesLabel.Size = UDim2.new(1, -10, 0, 20)
+beesLabel.Position = UDim2.new(0, 5, 0, 45)
+beesLabel.BackgroundTransparency = 1
+beesLabel.TextColor3 = Colors.Text
+beesLabel.Font = Enum.Font.Gotham
+beesLabel.TextSize = 12
+beesLabel.TextXAlignment = Enum.TextXAlignment.Left
+beesLabel.Parent = statsFrame
+
+currentY = currentY + 90
+
+-- Обновляем размер канваса
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, currentY)
+
+-- Обработка закрытия окна
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+    print("[ИНТЕРФЕЙС] Окно закрыто")
+end)
+
+-- РАБОЧИЕ ФУНКЦИИ АВТОФАРМА
 
 function StartAutoFarm()
     spawn(function()
-        local walkPattern = {
-            Random = function(center)
-                return center + Vector3.new(
-                    math.random(-Settings.FarmRadius, Settings.FarmRadius),
-                    0,
-                    math.random(-Settings.FarmRadius, Settings.FarmRadius)
-                )
-            end,
-            
-            Circle = function(center, angle)
-                local radius = Settings.FarmRadius * 0.8
-                return center + Vector3.new(
-                    math.cos(angle) * radius,
-                    0,
-                    math.sin(angle) * radius
-                )
-            end,
-            
-            Square = function(center, step)
-                local side = math.floor(step / 4) % 4
-                local pos = step % (Settings.FarmRadius * 2)
-                
-                if side == 0 then
-                    return center + Vector3.new(pos - Settings.FarmRadius, 0, -Settings.FarmRadius)
-                elseif side == 1 then
-                    return center + Vector3.new(Settings.FarmRadius, 0, pos - Settings.FarmRadius)
-                elseif side == 2 then
-                    return center + Vector3.new(Settings.FarmRadius - pos, 0, Settings.FarmRadius)
-                else
-                    return center + Vector3.new(-Settings.FarmRadius, 0, Settings.FarmRadius - pos)
-                end
-            end
-        }
-        
         local step = 0
         local angle = 0
         
@@ -301,87 +542,181 @@ function StartAutoFarm()
                 local root = character:FindFirstChild("HumanoidRootPart")
                 if not humanoid or not root then return end
                 
-                -- Получаем центр текущего поля
-                local fieldCenter = GetFieldCenter()
+                -- Получаем позицию поля
+                local fieldPos = GetFieldPosition()
                 
-                -- Выбираем следующую точку для движения
-                local targetPosition
+                -- Выбираем следующую точку в зависимости от режима
+                local targetPos
                 if Settings.WalkMode == "Circle" then
-                    targetPosition = walkPattern.Circle(fieldCenter, angle)
-                    angle = angle + 0.1
+                    targetPos = fieldPos + Vector3.new(
+                        math.cos(angle) * Settings.FarmRadius,
+                        0,
+                        math.sin(angle) * Settings.FarmRadius
+                    )
+                    angle = angle + 0.2
+                    
                 elseif Settings.WalkMode == "Square" then
-                    targetPosition = walkPattern.Square(fieldCenter, step)
-                    step = step + 5
+                    local side = math.floor(step / 20) % 4
+                    local pos = step % (Settings.FarmRadius * 2)
+                    
+                    if side == 0 then
+                        targetPos = fieldPos + Vector3.new(pos - Settings.FarmRadius, 0, -Settings.FarmRadius)
+                    elseif side == 1 then
+                        targetPos = fieldPos + Vector3.new(Settings.FarmRadius, 0, pos - Settings.FarmRadius)
+                    elseif side == 2 then
+                        targetPos = fieldPos + Vector3.new(Settings.FarmRadius - pos, 0, Settings.FarmRadius)
+                    else
+                        targetPos = fieldPos + Vector3.new(-Settings.FarmRadius, 0, Settings.FarmRadius - pos)
+                    end
+                    step = step + 10
+                    
+                elseif Settings.WalkMode == "ZigZag" then
+                    local x = (step % (Settings.FarmRadius * 2)) - Settings.FarmRadius
+                    local z = Settings.FarmRadius * math.sin(step / 20)
+                    targetPos = fieldPos + Vector3.new(x, 0, z)
+                    step = step + 15
+                    
                 else -- Random
-                    targetPosition = walkPattern.Random(fieldCenter)
+                    targetPos = fieldPos + Vector3.new(
+                        math.random(-Settings.FarmRadius, Settings.FarmRadius),
+                        0,
+                        math.random(-Settings.FarmRadius, Settings.FarmRadius)
+                    )
                 end
                 
                 -- Двигаемся к точке
-                humanoid:MoveTo(targetPosition)
+                humanoid:MoveTo(targetPos)
                 
-                -- Делаем клики для сбора пыльцы
-                ClickForPollen()
+                -- Делаем клик для сбора пыльцы (LMB)
+                CollectPollen()
                 
-                if Settings.DebugMode then
-                    print(string.format("[DEBUG] Движение к: %s, Позиция: %s", 
-                        tostring(targetPosition), tostring(root.Position)))
-                end
-                
-                -- Ждём немного перед следующим действием
+                -- Небольшая задержка
                 wait(0.3)
             end)
         end
     end)
 end
 
-function ClickForPollen()
-    -- Симулируем клик LMB для сбора пыльцы
-    -- В Bee Swarm Simulator это может быть:
-    -- 1. Событие в ReplicatedStorage
-    -- 2. Вызов функции сбора
-    -- 3. Просто клик мыши
-    
+function StartTokenCollect()
+    spawn(function()
+        while Settings.AutoTokens do
+            pcall(function()
+                local character = Player.Character
+                if not character then return end
+                
+                local root = character:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+                
+                -- Ищем токены с именем "Orb" (или содержащим "Orb")
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if not Settings.AutoTokens then break end
+                    
+                    if obj:IsA("BasePart") then
+                        local name = obj.Name
+                        if name:find("Orb") or name == Settings.TokenName then
+                            local distance = (root.Position - obj.Position).Magnitude
+                            
+                            if distance < Settings.TokenRange then
+                                -- Собираем токен
+                                CollectToken(obj)
+                                
+                                -- Делаем паузу между сборами
+                                wait(0.1)
+                            end
+                        end
+                    end
+                end
+            end)
+            wait(0.5) -- Сканируем каждые 0.5 секунд
+        end
+    end)
+end
+
+function CollectPollen()
+    -- Метод 1: Через RemoteEvent (самый вероятный в Bee Swarm)
     pcall(function()
-        -- Попробуем разные методы
-        
-        -- Метод 1: Через ReplicatedStorage (самый вероятный)
         if game:GetService("ReplicatedStorage"):FindFirstChild("Events") then
             local events = game:GetService("ReplicatedStorage").Events
             
-            -- Попробуем найти событие сбора
-            for _, event in pairs(events:GetChildren()) do
-                if event:IsA("RemoteEvent") then
-                    if event.Name:find("Click") or event.Name:find("Collect") then
-                        event:FireServer("Collect")
-                        if Settings.DebugMode then
-                            print("[CLICK] Отправлено событие: " .. event.Name)
-                        end
+            -- Попробуем разные события
+            local possibleEvents = {"PlayerClick", "Click", "Collect", "Farm", "Gather"}
+            
+            for _, eventName in ipairs(possibleEvents) do
+                local event = events:FindFirstChild(eventName)
+                if event and event:IsA("RemoteEvent") then
+                    -- Отправляем клик на текущую позицию
+                    local character = Player.Character
+                    if character and character:FindFirstChild("HumanoidRootPart") then
+                        event:FireServer(character.HumanoidRootPart.Position, "Collect")
+                        return true
                     end
                 end
             end
         end
-        
-        -- Метод 2: Просто клик (если игра использует Input)
-        -- Это сработает только если инжектор может симулировать реальный клик
-        if UIS then
-            -- Создаём фиктивный клик
-            -- (Это может не сработать в зависимости от защиты игры)
-        end
-        
-        -- Метод 3: Если есть инструмент сбора
+    end)
+    
+    -- Метод 2: Если есть инструмент сбора
+    pcall(function()
         local character = Player.Character
         if character then
             local tool = character:FindFirstChildOfClass("Tool")
             if tool and tool:FindFirstChild("Click") then
                 tool.Click:Fire()
+                return true
             end
         end
     end)
     
-    wait(Settings.ClickDelay)
+    return false
 end
 
-function GetFieldCenter()
+function CollectToken(token)
+    -- Пробуем разные методы сбора токена
+    
+    -- Метод 1: TouchInterest (самый надёжный)
+    pcall(function()
+        local character = Player.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            local root = character.HumanoidRootPart
+            
+            -- Телепортируемся к токену
+            root.CFrame = CFrame.new(token.Position + Vector3.new(0, 3, 0))
+            
+            -- Активируем TouchInterest
+            firetouchinterest(root, token, 0)
+            firetouchinterest(root, token, 1)
+            
+            wait(0.1)
+            return true
+        end
+    end)
+    
+    -- Метод 2: ProximityPrompt
+    pcall(function()
+        if token:FindFirstChildWhichIsA("ProximityPrompt") then
+            fireproximityprompt(token:FindFirstChildWhichIsA("ProximityPrompt"))
+            return true
+        end
+    end)
+    
+    -- Метод 3: RemoteEvent
+    pcall(function()
+        if game:GetService("ReplicatedStorage"):FindFirstChild("Events") then
+            local events = game:GetService("ReplicatedStorage").Events
+            
+            for _, event in pairs(events:GetChildren()) do
+                if event:IsA("RemoteEvent") and event.Name:find("Collect") then
+                    event:FireServer(token.Name, token.Position)
+                    return true
+                end
+            end
+        end
+    end)
+    
+    return false
+end
+
+function GetFieldPosition()
     -- Пытаемся найти поле автоматически
     local field = workspace:FindFirstChild(Settings.CurrentField)
     if field and field:IsA("BasePart") then
@@ -391,22 +726,40 @@ function GetFieldCenter()
     -- Ищем по названию в потомках
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj.Name:find(Settings.CurrentField) and obj:IsA("BasePart") then
-            FieldPositions[Settings.CurrentField] = obj.Position
             return obj.Position
         end
     end
     
-    -- Если не нашли, используем сохранённую позицию
-    return FieldPositions[Settings.CurrentField] or Vector3.new(0, 0, 0)
+    -- Координаты по умолчанию для популярных полей
+    local defaultPositions = {
+        ["Sunflower Field"] = Vector3.new(0, 0, 0),
+        ["Pineapple Patch"] = Vector3.new(100, 0, 0),
+        ["Bamboo Field"] = Vector3.new(-100, 0, 0),
+        ["Mushroom Field"] = Vector3.new(0, 0, 100),
+        ["Clover Field"] = Vector3.new(0, 0, -100)
+    }
+    
+    return defaultPositions[Settings.CurrentField] or Vector3.new(0, 0, 0)
 end
 
 function TeleportToField(fieldName)
-    local center = GetFieldCenter()
+    local position = GetFieldPosition()
     local character = Player.Character
+    
     if character and character:FindFirstChild("HumanoidRootPart") then
-        character.HumanoidRootPart.CFrame = CFrame.new(center + Vector3.new(0, 5, 0))
-        print("[TELEPORT] Телепортирован на поле: " .. fieldName)
+        character.HumanoidRootPart.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
+        print("[ТЕЛЕПОРТ] Перемещён на поле: " .. fieldName)
     end
+end
+
+function TeleportToHive()
+    pcall(function()
+        local hive = workspace.Hives:FindFirstChild(Player.Name)
+        if hive then
+            Player.Character:SetPrimaryPartCFrame(hive.CFrame + Vector3.new(0, 5, 0))
+            print("[ТЕЛЕПОРТ] Перемещён к улью")
+        end
+    end)
 end
 
 function ApplySpeedHack()
@@ -423,37 +776,80 @@ function ApplySpeedHack()
 end
 
 function ShowStats()
-    print("\n" .. string.rep("=", 50))
-    print("📊 СТАТИСТИКА СКРИПТА")
-    print("Скорость: " .. Settings.WalkSpeed)
-    print("Прыжок: " .. Settings.JumpPower)
-    print("Поле: " .. Settings.CurrentField)
-    print("Режим: " .. Settings.WalkMode)
-    print("Автофарм: " .. (Settings.AutoFarm and "ВКЛ" or "ВЫКЛ"))
-    print("Токены: " .. (Settings.AutoTokens and "ВКЛ" or "ВЫКЛ"))
-    print(string.rep("=", 50))
+    pcall(function()
+        local statsText = "\n📊 СТАТИСТИКА ИГРОКА:\n"
+        
+        -- Проверяем наличие PlayerStats
+        if Player:FindFirstChild("PlayerStats") then
+            local playerStats = Player.PlayerStats
+            
+            if playerStats:FindFirstChild("Pollen") then
+                statsText = statsText .. "🌼 Пыльца: " .. playerStats.Pollen.Value .. "\n"
+                pollenLabel.Text = "Пыльца: " .. playerStats.Pollen.Value
+            end
+            
+            if playerStats:FindFirstChild("Honey") then
+                statsText = statsText .. "🍯 Мёд: " .. playerStats.Honey.Value .. "\n"
+            end
+        end
+        
+        -- Проверяем улей
+        local hive = workspace.Hives:FindFirstChild(Player.Name)
+        if hive and hive:FindFirstChild("Bees") then
+            local beeCount = #hive.Bees:GetChildren()
+            statsText = statsText .. "🐝 Пчёл в улье: " .. beeCount .. "\n"
+            beesLabel.Text = "Пчёлы: " .. beeCount
+        end
+        
+        print(statsText)
+    end)
 end
 
--- Автоприменение SpeedHack
+function OptimizeGame()
+    pcall(function()
+        settings().Rendering.QualityLevel = 1
+        
+        for _, effect in pairs(workspace:GetDescendants()) do
+            if effect:IsA("ParticleEmitter") then
+                effect.Enabled = false
+            end
+        end
+        
+        print("[ОПТИМИЗАЦИЯ] Графика упрощена для FPS")
+    end)
+end
+
+-- Автоматическое обновление SpeedHack
 Player.CharacterAdded:Connect(function()
-    wait(1)
+    wait(2)
     ApplySpeedHack()
+end)
+
+-- Обновление статистики каждые 10 секунд
+spawn(function()
+    while wait(10) do
+        if ScreenGui.Parent then
+            ShowStats()
+        end
+    end
 end)
 
 -- Инициализация
 ApplySpeedHack()
+ShowStats()
 
 print("\n" .. string.rep("=", 60))
-print("🐝 BEE SWARM ULTIMATE FARMER v4.0")
-print("👤 Пользователь: " .. Player.Name)
+print("🐝 BEE SWARM ULTIMATE FARMER v5.0")
+print("📌 Токены найдены: " .. Settings.TokenName)
 print("🎮 Инжектор: Xeno")
 print("")
 print("🚀 ФУНКЦИИ:")
-print("   • ⚡ SpeedHack (скорость и прыжок)")
+print("   • ⚡ SpeedHack с выбором скорости (слайдеры)")
 print("   • 🌻 Автофарм пыльцы (клики LMB)")
-print("   • 🌟 Автосбор токенов (скоро)")
-print("   • 🌍 4 поля для фарма")
-print("   • 🚶 3 режима движения")
-print("   • 🔍 Диагностика токенов")
+print("   • 🌟 Автосбор токенов Orb")
+print("   • 🌍 5 полей с обновляемыми кнопками")
+print("   • 🚶 4 режима движения")
+print("   • 📡 Телепорт на поле/к улью")
+print("   • 📊 Статистика в реальном времени")
 print(string.rep("=", 60))
-warn("Интерфейс загружен! Используй кнопки для управления.")
+print("Интерфейс загружен! Управляй через панель.")
