@@ -1,12 +1,227 @@
-print("1. Пробуем загрузить Rayfield...")
-local success, Rayfield = pcall(function()
-    return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
-end)
+-- Bee Swarm Simulator Auto Farmer v1.0 - Guaranteed Version
+-- Вставь в инжектор: loadstring(game:HttpGet('https://raw.githubusercontent.com/tamoha666/ResearchModule1.lua/refs/heads/main/1m'))()
 
-if success and Rayfield then
-    print("✅ Rayfield загружен!")
-    warn(Rayfield) -- Посмотрим, что вернулось
-else
-    print("❌ Ошибка загрузки Rayfield!")
-    warn(Rayfield) -- Здесь будет текст ошибки
+local Player = game:GetService("Players").LocalPlayer
+local Mouse = Player:GetMouse()
+
+-- Создаём своё окно (вместо Rayfield)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BeeFarmGUI"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 350, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Text = "🐝 BEE SWARM AUTOFARMER 🐝"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Parent = MainFrame
+
+-- Таблички со статусами функций
+local StatusLabels = {}
+local Functions = {
+    AutoCollect = {running = false, text = "✅ Автосбор пыльцы: ВЫКЛ"},
+    AutoAttack = {running = false, text = "⚔️ Автоатака мобов: ВЫКЛ", target = "Ladybug"},
+    AutoBuyBees = {running = false, text = "🛒 Автопокупка пчёл: ВЫКЛ"}
+}
+
+-- Создаём кнопки управления
+local buttonPositions = {
+    {name = "▶️ Старт сбора", func = "AutoCollect", yPos = 50},
+    {name = "⚔️ Старт атаки", func = "AutoAttack", yPos = 90},
+    {name = "🛒 Купить пчёл", func = "AutoBuyBees", yPos = 130},
+    {name = "⏸️ ВСЁ СТОП", func = "STOPALL", yPos = 170},
+    {name = "🎯 Цель: Ladybug", func = "CHANGE_TARGET", yPos = 210},
+    {name = "📊 Обновить статус", func = "UPDATE_STATS", yPos = 250},
+    {name = "❌ Закрыть GUI", func = "CLOSE_GUI", yPos = 290}
+}
+
+for i, btnInfo in ipairs(buttonPositions) do
+    local button = Instance.new("TextButton")
+    button.Text = btnInfo.name
+    button.Size = UDim2.new(0.9, 0, 0, 35)
+    button.Position = UDim2.new(0.05, 0, 0, btnInfo.yPos)
+    button.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 14
+    button.Parent = MainFrame
+    
+    -- Статус-лейбл рядом с кнопкой
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Text = ""
+    statusLabel.Size = UDim2.new(0.9, 0, 0, 20)
+    statusLabel.Position = UDim2.new(0.05, 0, 0, btnInfo.yPos + 35)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 12
+    statusLabel.Parent = MainFrame
+    
+    StatusLabels[btnInfo.func] = statusLabel
+    
+    -- Обработка нажатий
+    button.MouseButton1Click:Connect(function()
+        if btnInfo.func == "STOPALL" then
+            for funcName in pairs(Functions) do
+                Functions[funcName].running = false
+                StatusLabels[funcName].Text = Functions[funcName].text
+            end
+            print("[SYSTEM] Все функции остановлены")
+            
+        elseif btnInfo.func == "CHANGE_TARGET" then
+            local mobs = {"Ladybug", "Rhino Beetle", "Mantis", "Spider"}
+            local current = Functions.AutoAttack.target
+            local nextIndex = 1
+            for i, mob in ipairs(mobs) do
+                if mob == current then
+                    nextIndex = (i % #mobs) + 1
+                    break
+                end
+            end
+            Functions.AutoAttack.target = mobs[nextIndex]
+            button.Text = "🎯 Цель: " .. mobs[nextIndex]
+            print("[SYSTEM] Цель изменена на: " .. mobs[nextIndex])
+            
+        elseif btnInfo.func == "UPDATE_STATS" then
+            UpdateDisplayStats()
+            
+        elseif btnInfo.func == "CLOSE_GUI" then
+            ScreenGui:Destroy()
+            print("[SYSTEM] Интерфейс закрыт")
+            
+        elseif Functions[btnInfo.func] then
+            Functions[btnInfo.func].running = not Functions[btnInfo.func].running
+            StatusLabels[btnInfo.func].Text = Functions[btnInfo.func].running and "🟢 РАБОТАЕТ" or "🔴 ВЫКЛ"
+            
+            if Functions[btnInfo.func].running then
+                print("[SYSTEM] Запущено: " .. btnInfo.func)
+                if btnInfo.func == "AutoCollect" then StartAutoCollect() end
+                if btnInfo.func == "AutoAttack" then StartAutoAttack() end
+                if btnInfo.func == "AutoBuyBees" then StartAutoBuyBees() end
+            else
+                print("[SYSTEM] Остановлено: " .. btnInfo.func)
+            end
+        end
+    end)
 end
+
+-- Функции фарма (оставляем рабочую логику, убираем сложности)
+function StartAutoCollect()
+    spawn(function()
+        while Functions.AutoCollect.running do
+            pcall(function()
+                -- Просто кликаем по цветкам вокруг
+                local character = Player.Character
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    -- Ищем ближайший цветок
+                    local nearestFlower = FindNearestObject("Flower")
+                    if nearestFlower and nearestFlower:FindFirstChild("Pollen") then
+                        -- Кликаем по нему
+                        fireproximityprompt(nearestFlower.Pollen.ProximityPrompt)
+                    end
+                end
+            end)
+            wait(0.3) -- Интервал кликов
+        end
+    end)
+end
+
+function StartAutoAttack()
+    spawn(function()
+        while Functions.AutoAttack.running do
+            pcall(function()
+                local targetName = Functions.AutoAttack.target
+                local mob = FindMob(targetName)
+                
+                if mob and mob:FindFirstChild("HumanoidRootPart") then
+                    -- Атакуем
+                    game:GetService("ReplicatedStorage").Events.PlayerClick:FireServer(
+                        mob.HumanoidRootPart.Position,
+                        "Attack"
+                    )
+                end
+            end)
+            wait(0.5)
+        end
+    end)
+end
+
+function StartAutoBuyBees()
+    spawn(function()
+        while Functions.AutoBuyBees.running do
+            pcall(function()
+                -- Просто отправляем запрос на покупку пчелы (если есть место)
+                game:GetService("ReplicatedStorage").Events.BeePurchaseRequest:FireServer()
+            end)
+            wait(2) -- Покупаем раз в 2 секунды
+        end
+    end)
+end
+
+-- Вспомогательные функции
+function FindNearestObject(objectName)
+    local character = Player.Character
+    if not character then return nil end
+    
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local nearest = nil
+    local nearestDist = math.huge
+    
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj.Name:find(objectName) and obj:FindFirstChild("Pollen") then
+            local dist = (root.Position - obj.Position).Magnitude
+            if dist < nearestDist and dist < 50 then
+                nearest = obj
+                nearestDist = dist
+            end
+        end
+    end
+    return nearest
+end
+
+function FindMob(mobName)
+    for _, mob in pairs(workspace.Mobs:GetChildren()) do
+        if mob.Name:find(mobName) and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+            return mob
+        end
+    end
+    return nil
+end
+
+function UpdateDisplayStats()
+    pcall(function()
+        -- Простая информация
+        local hive = workspace.Hives:FindFirstChild(Player.Name)
+        if hive and hive:FindFirstChild("Bees") then
+            StatusLabels.UPDATE_STATS.Text = "Пчёл в улье: " .. #hive.Bees:GetChildren()
+        else
+            StatusLabels.UPDATE_STATS.Text = "Статистика недоступна"
+        end
+    end)
+end
+
+-- Информация о запуске
+StatusLabels.AutoCollect.Text = "🔴 ВЫКЛ"
+StatusLabels.AutoAttack.Text = "🔴 ВЫКЛ"
+StatusLabels.AutoBuyBees.Text = "🔴 ВЫКЛ"
+StatusLabels.UPDATE_STATS.Text = "Нажми для обновления"
+
+print("========================================")
+print("🐝 Bee Swarm Autofarmer ЗАПУЩЕН!")
+print("📌 Интерфейс появится в центре экрана")
+print("👤 Автор: tamoha666")
+print("========================================")
+warn("Скрипт активен. Управляй через панель.")
