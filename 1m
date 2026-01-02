@@ -1,155 +1,567 @@
--- Bee Swarm Simulator Auto Farmer v1.0 - Guaranteed Version
+-- Bee Swarm Simulator Auto Farmer PRO v2.0
 -- Вставь в инжектор: loadstring(game:HttpGet('https://raw.githubusercontent.com/tamoha666/ResearchModule1.lua/refs/heads/main/1m'))()
 
 local Player = game:GetService("Players").LocalPlayer
 local Mouse = Player:GetMouse()
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
 
--- Создаём своё окно (вместо Rayfield)
+-- Настройки
+local Settings = {
+    WalkSpeed = 50,
+    JumpPower = 50,
+    CollectRange = 50,
+    AutoCollect = false,
+    AutoBoostTokens = false,
+    AutoAttack = false,
+    AutoConvert = false,
+    TargetMob = "Ladybug",
+    SelectedField = "Sunflower Field",
+    FarmSpeed = 0.1
+}
+
+-- Цветовая схема
+local Colors = {
+    Background = Color3.fromRGB(25, 25, 35),
+    Header = Color3.fromRGB(44, 44, 60),
+    Button = Color3.fromRGB(65, 65, 90),
+    ButtonHover = Color3.fromRGB(80, 80, 110),
+    Text = Color3.fromRGB(240, 240, 255),
+    Accent = Color3.fromRGB(255, 215, 0), -- Золотой для пчёл
+    Success = Color3.fromRGB(100, 255, 100),
+    Danger = Color3.fromRGB(255, 100, 100)
+}
+
+-- Создаём продвинутый GUI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BeeFarmGUI"
+ScreenGui.Name = "BeeFarmPRO"
 ScreenGui.Parent = game.CoreGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
+-- Основное окно
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 350, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+MainFrame.Size = UDim2.new(0, 400, 0, 550)
+MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Colors.Background
+MainFrame.BackgroundTransparency = 0.1
 MainFrame.Active = true
 MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 
+-- Скруглённые углы
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = MainFrame
+
+-- Тень
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(60, 60, 80)
+UIStroke.Parent = MainFrame
+
+-- Заголовок
+local TitleFrame = Instance.new("Frame")
+TitleFrame.Size = UDim2.new(1, 0, 0, 50)
+TitleFrame.BackgroundColor3 = Colors.Header
+TitleFrame.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 12)
+TitleCorner.Parent = TitleFrame
+
 local Title = Instance.new("TextLabel")
-Title.Text = "🐝 BEE SWARM AUTOFARMER 🐝"
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+Title.Text = "🐝 BEE SWARM SIMULATOR PRO 🐝"
+Title.Size = UDim2.new(1, -20, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Colors.Accent
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
-Title.Parent = MainFrame
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleFrame
 
--- Таблички со статусами функций
-local StatusLabels = {}
-local Functions = {
-    AutoCollect = {running = false, text = "✅ Автосбор пыльцы: ВЫКЛ"},
-    AutoAttack = {running = false, text = "⚔️ Автоатака мобов: ВЫКЛ", target = "Ladybug"},
-    AutoBuyBees = {running = false, text = "🛒 Автопокупка пчёл: ВЫКЛ"}
-}
+local CloseButton = Instance.new("TextButton")
+CloseButton.Text = "×"
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -35, 0.5, -15)
+CloseButton.BackgroundColor3 = Colors.Danger
+CloseButton.TextColor3 = Colors.Text
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 20
+CloseButton.Parent = TitleFrame
 
--- Создаём кнопки управления
-local buttonPositions = {
-    {name = "▶️ Старт сбора", func = "AutoCollect", yPos = 50},
-    {name = "⚔️ Старт атаки", func = "AutoAttack", yPos = 90},
-    {name = "🛒 Купить пчёл", func = "AutoBuyBees", yPos = 130},
-    {name = "⏸️ ВСЁ СТОП", func = "STOPALL", yPos = 170},
-    {name = "🎯 Цель: Ladybug", func = "CHANGE_TARGET", yPos = 210},
-    {name = "📊 Обновить статус", func = "UPDATE_STATS", yPos = 250},
-    {name = "❌ Закрыть GUI", func = "CLOSE_GUI", yPos = 290}
-}
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(1, 0)
+CloseCorner.Parent = CloseButton
 
-for i, btnInfo in ipairs(buttonPositions) do
+-- Контейнер для кнопок с прокруткой
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, -20, 1, -70)
+ScrollFrame.Position = UDim2.new(0, 10, 0, 60)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.ScrollBarImageColor3 = Colors.Accent
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 800)
+ScrollFrame.Parent = MainFrame
+
+-- Функция создания красивой кнопки
+function CreateButton(text, yPosition, callback, color)
+    local buttonFrame = Instance.new("Frame")
+    buttonFrame.Size = UDim2.new(1, 0, 0, 40)
+    buttonFrame.Position = UDim2.new(0, 0, 0, yPosition)
+    buttonFrame.BackgroundTransparency = 1
+    buttonFrame.Parent = ScrollFrame
+    
     local button = Instance.new("TextButton")
-    button.Text = btnInfo.name
-    button.Size = UDim2.new(0.9, 0, 0, 35)
-    button.Position = UDim2.new(0.05, 0, 0, btnInfo.yPos)
-    button.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Text = text
+    button.Size = UDim2.new(1, 0, 1, 0)
+    button.BackgroundColor3 = color or Colors.Button
+    button.TextColor3 = Colors.Text
     button.Font = Enum.Font.Gotham
     button.TextSize = 14
-    button.Parent = MainFrame
+    button.AutoButtonColor = false
+    button.Parent = buttonFrame
     
-    -- Статус-лейбл рядом с кнопкой
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Text = ""
-    statusLabel.Size = UDim2.new(0.9, 0, 0, 20)
-    statusLabel.Position = UDim2.new(0.05, 0, 0, btnInfo.yPos + 35)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    statusLabel.Font = Enum.Font.Gotham
-    statusLabel.TextSize = 12
-    statusLabel.Parent = MainFrame
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.Parent = button
     
-    StatusLabels[btnInfo.func] = statusLabel
+    local buttonStroke = Instance.new("UIStroke")
+    buttonStroke.Thickness = 1
+    buttonStroke.Color = Color3.fromRGB(80, 80, 100)
+    buttonStroke.Parent = button
     
-    -- Обработка нажатий
-    button.MouseButton1Click:Connect(function()
-        if btnInfo.func == "STOPALL" then
-            for funcName in pairs(Functions) do
-                Functions[funcName].running = false
-                StatusLabels[funcName].Text = Functions[funcName].text
-            end
-            print("[SYSTEM] Все функции остановлены")
-            
-        elseif btnInfo.func == "CHANGE_TARGET" then
-            local mobs = {"Ladybug", "Rhino Beetle", "Mantis", "Spider"}
-            local current = Functions.AutoAttack.target
-            local nextIndex = 1
-            for i, mob in ipairs(mobs) do
-                if mob == current then
-                    nextIndex = (i % #mobs) + 1
-                    break
+    -- Эффект при наведении
+    button.MouseEnter:Connect(function()
+        game:GetService("TweenService"):Create(
+            button,
+            TweenInfo.new(0.2),
+            {BackgroundColor3 = Colors.ButtonHover}
+        ):Play()
+    end)
+    
+    button.MouseLeave:Connect(function()
+        game:GetService("TweenService"):Create(
+            button,
+            TweenInfo.new(0.2),
+            {BackgroundColor3 = color or Colors.Button}
+        ):Play()
+    end)
+    
+    button.MouseButton1Click:Connect(callback)
+    
+    return button, buttonFrame
+end
+
+-- Функция создания переключателя
+function CreateToggle(text, yPosition, initialState, callback)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Size = UDim2.new(1, 0, 0, 40)
+    toggleFrame.Position = UDim2.new(0, 0, 0, yPosition)
+    toggleFrame.BackgroundTransparency = 1
+    toggleFrame.Parent = ScrollFrame
+    
+    local toggleText = Instance.new("TextLabel")
+    toggleText.Text = text
+    toggleText.Size = UDim2.new(0.7, 0, 1, 0)
+    toggleText.Position = UDim2.new(0, 0, 0, 0)
+    toggleText.BackgroundTransparency = 1
+    toggleText.TextColor3 = Colors.Text
+    toggleText.Font = Enum.Font.Gotham
+    toggleText.TextSize = 14
+    toggleText.TextXAlignment = Enum.TextXAlignment.Left
+    toggleText.Parent = toggleFrame
+    
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0, 50, 0, 25)
+    toggleButton.Position = UDim2.new(1, -55, 0.5, -12.5)
+    toggleButton.BackgroundColor3 = initialState and Colors.Success or Colors.Danger
+    toggleButton.Text = initialState and "ON" or "OFF"
+    toggleButton.TextColor3 = Colors.Text
+    toggleButton.Font = Enum.Font.GothamBold
+    toggleButton.TextSize = 12
+    toggleButton.Parent = toggleFrame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggleButton
+    
+    toggleButton.MouseButton1Click:Connect(function()
+        local newState = not (toggleButton.Text == "ON")
+        toggleButton.Text = newState and "ON" or "OFF"
+        toggleButton.BackgroundColor3 = newState and Colors.Success or Colors.Danger
+        
+        if callback then
+            callback(newState)
+        end
+    end)
+    
+    return toggleButton
+end
+
+-- Функция создания слайдера
+function CreateSlider(text, yPosition, min, max, defaultValue, callback)
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = UDim2.new(1, 0, 0, 60)
+    sliderFrame.Position = UDim2.new(0, 0, 0, yPosition)
+    sliderFrame.BackgroundTransparency = 1
+    sliderFrame.Parent = ScrollFrame
+    
+    local sliderText = Instance.new("TextLabel")
+    sliderText.Text = text
+    sliderText.Size = UDim2.new(1, 0, 0, 20)
+    sliderText.BackgroundTransparency = 1
+    sliderText.TextColor3 = Colors.Text
+    sliderText.Font = Enum.Font.Gotham
+    sliderText.TextSize = 14
+    sliderText.TextXAlignment = Enum.TextXAlignment.Left
+    sliderText.Parent = sliderFrame
+    
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Text = tostring(defaultValue)
+    valueLabel.Size = UDim2.new(0, 40, 0, 20)
+    valueLabel.Position = UDim2.new(1, -40, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.TextColor3 = Colors.Accent
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.TextSize = 14
+    valueLabel.Parent = sliderFrame
+    
+    local sliderTrack = Instance.new("Frame")
+    sliderTrack.Size = UDim2.new(1, 0, 0, 6)
+    sliderTrack.Position = UDim2.new(0, 0, 0, 30)
+    sliderTrack.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
+    sliderTrack.Parent = sliderFrame
+    
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    trackCorner.Parent = sliderTrack
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((defaultValue - min) / (max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Colors.Accent
+    sliderFill.Parent = sliderTrack
+    
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = sliderFill
+    
+    local sliderButton = Instance.new("TextButton")
+    sliderButton.Size = UDim2.new(0, 20, 0, 20)
+    sliderButton.Position = UDim2.new((defaultValue - min) / (max - min), -10, 0.5, -10)
+    sliderButton.BackgroundColor3 = Colors.Text
+    sliderButton.Text = ""
+    sliderButton.Parent = sliderTrack
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(1, 0)
+    buttonCorner.Parent = sliderButton
+    
+    local dragging = false
+    
+    local function updateSlider(input)
+        local relativeX = (input.Position.X - sliderTrack.AbsolutePosition.X) / sliderTrack.AbsoluteSize.X
+        local value = math.clamp(min + (relativeX * (max - min)), min, max)
+        value = math.floor(value * 100) / 100
+        
+        valueLabel.Text = tostring(value)
+        sliderFill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
+        sliderButton.Position = UDim2.new((value - min) / (max - min), -10, 0.5, -10)
+        
+        if callback then
+            callback(value)
+        end
+    end
+    
+    sliderButton.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input)
+        end
+    end)
+    
+    return valueLabel
+end
+
+-- Создаём элементы интерфейса
+local currentY = 0
+
+-- Раздел: Автофарм
+local section1 = Instance.new("TextLabel")
+section1.Text = "⚡ АВТОФАРМ"
+section1.Size = UDim2.new(1, 0, 0, 30)
+section1.Position = UDim2.new(0, 0, 0, currentY)
+section1.BackgroundTransparency = 1
+section1.TextColor3 = Colors.Accent
+section1.Font = Enum.Font.GothamBold
+section1.TextSize = 16
+section1.TextXAlignment = Enum.TextXAlignment.Left
+section1.Parent = ScrollFrame
+currentY = currentY + 40
+
+local autoCollectToggle = CreateToggle("🌻 Автосбор пыльцы", currentY, false, function(state)
+    Settings.AutoCollect = state
+    if state then
+        StartAutoCollect()
+        print("[АВТОФАРМ] Автосбор пыльцы включён")
+    end
+end)
+currentY = currentY + 40
+
+local autoBoostToggle = CreateToggle("🌟 Автосбор токенов бустов", currentY, false, function(state)
+    Settings.AutoBoostTokens = state
+    if state then
+        StartBoostTokenCollect()
+        print("[АВТОФАРМ] Сбор токенов бустов включён")
+    end
+end)
+currentY = currentY + 40
+
+local autoAttackToggle = CreateToggle("⚔️ Автоатака мобов", currentY, false, function(state)
+    Settings.AutoAttack = state
+    if state then
+        StartAutoAttack()
+        print("[АВТОФАРМ] Автоатака включена")
+    end
+end)
+currentY = currentY + 50
+
+-- Выбор цели для атаки
+local targetButton = CreateButton("🎯 Цель: " .. Settings.TargetMob, currentY, function()
+    local mobs = {"Ladybug", "Rhino Beetle", "Mantis", "Spider", "Scorpion"}
+    local currentIndex = 1
+    for i, mob in ipairs(mobs) do
+        if mob == Settings.TargetMob then
+            currentIndex = i
+            break
+        end
+    end
+    local nextIndex = (currentIndex % #mobs) + 1
+    Settings.TargetMob = mobs[nextIndex]
+    targetButton.Text = "🎯 Цель: " .. Settings.TargetMob
+    print("[НАСТРОЙКИ] Цель изменена на: " .. Settings.TargetMob)
+end)
+currentY = currentY + 50
+
+-- Раздел: Улучшения
+local section2 = Instance.new("TextLabel")
+section2.Text = "🚀 УЛУЧШЕНИЯ"
+section2.Size = UDim2.new(1, 0, 0, 30)
+section2.Position = UDim2.new(0, 0, 0, currentY)
+section2.BackgroundTransparency = 1
+section2.TextColor3 = Colors.Accent
+section2.Font = Enum.Font.GothamBold
+section2.TextSize = 16
+section2.TextXAlignment = Enum.TextXAlignment.Left
+section2.Parent = ScrollFrame
+currentY = currentY + 40
+
+-- SpeedHack
+local speedSlider = CreateSlider("⚡ Скорость передвижения", currentY, 16, 200, Settings.WalkSpeed, function(value)
+    Settings.WalkSpeed = value
+    ApplySpeedHack()
+end)
+currentY = currentY + 70
+
+local jumpSlider = CreateSlider("🦘 Высота прыжка", currentY, 50, 200, Settings.JumpPower, function(value)
+    Settings.JumpPower = value
+    ApplySpeedHack()
+end)
+currentY = currentY + 70
+
+-- Раздел: Утилиты
+local section3 = Instance.new("TextLabel")
+section3.Text = "🔧 УТИЛИТЫ"
+section3.Size = UDim2.new(1, 0, 0, 30)
+section3.Position = UDim2.new(0, 0, 0, currentY)
+section3.BackgroundTransparency = 1
+section3.TextColor3 = Colors.Accent
+section3.Font = Enum.Font.GothamBold
+section3.TextSize = 16
+section3.TextXAlignment = Enum.TextXAlignment.Left
+section3.Parent = ScrollFrame
+currentY = currentY + 40
+
+CreateButton("🔄 Телепорт на спавн", currentY, function()
+    TeleportToSpawn()
+end)
+currentY = currentY + 50
+
+CreateButton("🏠 Телепорт к своему улью", currentY, function()
+    TeleportToHive()
+end)
+currentY = currentY + 50
+
+CreateButton("📊 Показать статистику", currentY, function()
+    ShowStatistics()
+end)
+currentY = currentY + 50
+
+CreateButton("🔧 Оптимизировать игру", currentY, function()
+    OptimizeGame()
+end)
+currentY = currentY + 50
+
+-- Обновляем размер канваса
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, currentY)
+
+-- Обработка закрытия окна
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+    print("[ИНТЕРФЕЙС] Окно закрыто")
+end)
+
+-- ФУНКЦИИ АВТОФАРМА
+
+function StartAutoCollect()
+    spawn(function()
+        while Settings.AutoCollect do
+            pcall(function()
+                local character = Player.Character
+                if not character then return end
+                
+                local humanoid = character:FindFirstChild("Humanoid")
+                local root = character:FindFirstChild("HumanoidRootPart")
+                if not humanoid or not root then return end
+                
+                -- Ищем ближайший цветок
+                local nearestFlower = nil
+                local nearestDistance = Settings.CollectRange
+                
+                for _, obj in pairs(workspace:GetChildren()) do
+                    if obj.Name == "Flower" or obj.Name:find("Field") then
+                        if obj:FindFirstChild("Pollen") then
+                            local distance = (root.Position - obj.Position).Magnitude
+                            if distance < nearestDistance then
+                                nearestFlower = obj
+                                nearestDistance = distance
+                            end
+                        end
+                    end
                 end
-            end
-            Functions.AutoAttack.target = mobs[nextIndex]
-            button.Text = "🎯 Цель: " .. mobs[nextIndex]
-            print("[SYSTEM] Цель изменена на: " .. mobs[nextIndex])
-            
-        elseif btnInfo.func == "UPDATE_STATS" then
-            UpdateDisplayStats()
-            
-        elseif btnInfo.func == "CLOSE_GUI" then
-            ScreenGui:Destroy()
-            print("[SYSTEM] Интерфейс закрыт")
-            
-        elseif Functions[btnInfo.func] then
-            Functions[btnInfo.func].running = not Functions[btnInfo.func].running
-            StatusLabels[btnInfo.func].Text = Functions[btnInfo.func].running and "🟢 РАБОТАЕТ" or "🔴 ВЫКЛ"
-            
-            if Functions[btnInfo.func].running then
-                print("[SYSTEM] Запущено: " .. btnInfo.func)
-                if btnInfo.func == "AutoCollect" then StartAutoCollect() end
-                if btnInfo.func == "AutoAttack" then StartAutoAttack() end
-                if btnInfo.func == "AutoBuyBees" then StartAutoBuyBees() end
-            else
-                print("[SYSTEM] Остановлено: " .. btnInfo.func)
-            end
+                
+                -- Если нашли цветок - идём к нему и собираем
+                if nearestFlower then
+                    -- Двигаемся к цветку
+                    humanoid:MoveTo(nearestFlower.Position)
+                    
+                    -- Ждём пока подойдём близко
+                    wait(0.2)
+                    
+                    -- Кликаем по цветку (имитируем LMB)
+                    if nearestFlower:FindFirstChild("Pollen") then
+                        fireproximityprompt(nearestFlower.Pollen.ProximityPrompt)
+                        
+                        -- Дополнительный клик через реплицированное событие
+                        game:GetService("ReplicatedStorage").Events.PlayerClick:FireServer(
+                            nearestFlower.Position,
+                            "Collect"
+                        )
+                    end
+                else
+                    -- Если цветков нет рядом, перемещаемся случайно
+                    local randomPos = root.Position + Vector3.new(
+                        math.random(-50, 50),
+                        0,
+                        math.random(-50, 50)
+                    )
+                    humanoid:MoveTo(randomPos)
+                end
+            end)
+            wait(Settings.FarmSpeed)
         end
     end)
 end
 
--- Функции фарма (оставляем рабочую логику, убираем сложности)
-function StartAutoCollect()
+function StartBoostTokenCollect()
     spawn(function()
-        while Functions.AutoCollect.running do
+        while Settings.AutoBoostTokens do
             pcall(function()
-                -- Просто кликаем по цветкам вокруг
                 local character = Player.Character
-                if character and character:FindFirstChild("HumanoidRootPart") then
-                    -- Ищем ближайший цветок
-                    local nearestFlower = FindNearestObject("Flower")
-                    if nearestFlower and nearestFlower:FindFirstChild("Pollen") then
-                        -- Кликаем по нему
-                        fireproximityprompt(nearestFlower.Pollen.ProximityPrompt)
+                if not character then return end
+                
+                local root = character:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+                
+                -- Ищем токены бустов
+                for _, obj in pairs(workspace:GetChildren()) do
+                    if obj.Name:find("Token") or obj.Name:find("Boost") then
+                        if obj:IsA("BasePart") then
+                            local distance = (root.Position - obj.Position).Magnitude
+                            if distance < Settings.CollectRange then
+                                -- Телепортируемся к токену
+                                root.CFrame = CFrame.new(obj.Position + Vector3.new(0, 3, 0))
+                                wait(0.1)
+                                
+                                -- Активируем токен
+                                firetouchinterest(root, obj, 0)
+                                firetouchinterest(root, obj, 1)
+                            end
+                        end
                     end
                 end
             end)
-            wait(0.3) -- Интервал кликов
+            wait(0.3)
         end
     end)
 end
 
 function StartAutoAttack()
     spawn(function()
-        while Functions.AutoAttack.running do
+        while Settings.AutoAttack do
             pcall(function()
-                local targetName = Functions.AutoAttack.target
-                local mob = FindMob(targetName)
+                local character = Player.Character
+                if not character then return end
                 
-                if mob and mob:FindFirstChild("HumanoidRootPart") then
+                local humanoid = character:FindFirstChild("Humanoid")
+                local root = character:FindFirstChild("HumanoidRootPart")
+                if not humanoid or not root then return end
+                
+                -- Ищем моба
+                local targetMob = nil
+                for _, mob in pairs(workspace.Mobs:GetChildren()) do
+                    if mob.Name:find(Settings.TargetMob) then
+                        if mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+                            targetMob = mob
+                            break
+                        end
+                    end
+                end
+                
+                if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
+                    -- Двигаемся к мобу
+                    humanoid:MoveTo(targetMob.HumanoidRootPart.Position)
+                    wait(0.2)
+                    
                     -- Атакуем
                     game:GetService("ReplicatedStorage").Events.PlayerClick:FireServer(
-                        mob.HumanoidRootPart.Position,
+                        targetMob.HumanoidRootPart.Position,
                         "Attack"
                     )
+                    
+                    -- Непрерывная атака пока жив
+                    for i = 1, 5 do
+                        if not Settings.AutoAttack then break end
+                        if targetMob.Humanoid.Health > 0 then
+                            game:GetService("ReplicatedStorage").Events.PlayerClick:FireServer(
+                                targetMob.HumanoidRootPart.Position,
+                                "Attack"
+                            )
+                            wait(0.2)
+                        else
+                            break
+                        end
+                    end
                 end
             end)
             wait(0.5)
@@ -157,71 +569,98 @@ function StartAutoAttack()
     end)
 end
 
-function StartAutoBuyBees()
-    spawn(function()
-        while Functions.AutoBuyBees.running do
-            pcall(function()
-                -- Просто отправляем запрос на покупку пчелы (если есть место)
-                game:GetService("ReplicatedStorage").Events.BeePurchaseRequest:FireServer()
-            end)
-            wait(2) -- Покупаем раз в 2 секунды
-        end
-    end)
-end
-
--- Вспомогательные функции
-function FindNearestObject(objectName)
-    local character = Player.Character
-    if not character then return nil end
-    
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
-    
-    local nearest = nil
-    local nearestDist = math.huge
-    
-    for _, obj in pairs(workspace:GetChildren()) do
-        if obj.Name:find(objectName) and obj:FindFirstChild("Pollen") then
-            local dist = (root.Position - obj.Position).Magnitude
-            if dist < nearestDist and dist < 50 then
-                nearest = obj
-                nearestDist = dist
+function ApplySpeedHack()
+    pcall(function()
+        local character = Player.Character
+        if character then
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = Settings.WalkSpeed
+                humanoid.JumpPower = Settings.JumpPower
             end
         end
-    end
-    return nearest
+    end)
 end
 
-function FindMob(mobName)
-    for _, mob in pairs(workspace.Mobs:GetChildren()) do
-        if mob.Name:find(mobName) and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
-            return mob
-        end
-    end
-    return nil
-end
-
-function UpdateDisplayStats()
+-- Утилиты
+function TeleportToSpawn()
     pcall(function()
-        -- Простая информация
-        local hive = workspace.Hives:FindFirstChild(Player.Name)
-        if hive and hive:FindFirstChild("Bees") then
-            StatusLabels.UPDATE_STATS.Text = "Пчёл в улье: " .. #hive.Bees:GetChildren()
-        else
-            StatusLabels.UPDATE_STATS.Text = "Статистика недоступна"
+        local spawn = workspace:FindFirstChild("SpawnPos") or workspace:FindFirstChild("Spawn")
+        if spawn then
+            Player.Character:SetPrimaryPartCFrame(spawn.CFrame)
+            print("[ТЕЛЕПОРТ] Перемещён на спавн")
         end
     end)
 end
 
--- Информация о запуске
-StatusLabels.AutoCollect.Text = "🔴 ВЫКЛ"
-StatusLabels.AutoAttack.Text = "🔴 ВЫКЛ"
-StatusLabels.AutoBuyBees.Text = "🔴 ВЫКЛ"
-StatusLabels.UPDATE_STATS.Text = "Нажми для обновления"
+function TeleportToHive()
+    pcall(function()
+        local hive = workspace.Hives:FindFirstChild(Player.Name)
+        if hive then
+            Player.Character:SetPrimaryPartCFrame(hive.CFrame + Vector3.new(0, 5, 0))
+            print("[ТЕЛЕПОРТ] Перемещён к улью")
+        end
+    end)
+end
 
-print("========================================")
-print("🐝 Bee Swarm Autofarmer ЗАПУЩЕН!")
-print("📌 Интерфейс появится в центре экрана")
-print("👤 Автор: tamoha666")
-print("========================================")
-warn("Скрипт активен. Управляй через панель.")
+function ShowStatistics()
+    pcall(function()
+        local hive = workspace.Hives:FindFirstChild(Player.Name)
+        local stats = ""
+        
+        if hive and hive:FindFirstChild("Bees") then
+            stats = stats .. "🐝 Пчёл в улье: " .. #hive.Bees:GetChildren() .. "\n"
+        end
+        
+        -- Проверяем наличие PlayerStats
+        if Player:FindFirstChild("PlayerStats") then
+            local playerStats = Player.PlayerStats
+            if playerStats:FindFirstChild("Pollen") then
+                stats = stats .. "🌼 Пыльца: " .. playerStats.Pollen.Value .. "\n"
+            end
+            if playerStats:FindFirstChild("Honey") then
+                stats = stats .. "🍯 Мёд: " .. playerStats.Honey.Value .. "\n"
+            end
+        end
+        
+        print("\n" .. string.rep("=", 40))
+        print("📊 СТАТИСТИКА ИГРОКА")
+        print(stats)
+        print(string.rep("=", 40))
+    end)
+end
+
+function OptimizeGame()
+    pcall(function()
+        -- Уменьшаем качество графики для производительности
+        settings().Rendering.QualityLevel = 1
+        
+        -- Отключаем некоторые эффекты
+        for _, effect in pairs(workspace:GetDescendants()) do
+            if effect:IsA("ParticleEmitter") or effect:IsA("Trail") then
+                effect.Enabled = false
+            end
+        end
+        
+        print("[ОПТИМИЗАЦИЯ] Настройки графики уменьшены для FPS")
+    end)
+end
+
+-- Автоматически применяем SpeedHack при изменении персонажа
+Player.CharacterAdded:Connect(function()
+    wait(1)
+    ApplySpeedHack()
+end)
+
+-- Информация о запуске
+print("\n" .. string.rep("=", 50))
+print("🐝 BEE SWARM SIMULATOR PRO v2.0")
+print("📌 Автор: tamoha666")
+print("🔥 Функции:")
+print("   • 🌻 Автосбор пыльцы (бегает и кликает)")
+print("   • 🌟 Автосбор токенов бустов")
+print("   • ⚔️ Автоатака мобов с выбором цели")
+print("   • ⚡ SpeedHack (скорость и высота прыжка)")
+print("   • 🚀 Дополнительные утилиты")
+print(string.rep("=", 50))
+warn("Интерфейс загружен! Управляй через панель слева.")
